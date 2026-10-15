@@ -102,9 +102,10 @@
 
     <main class="flex-1 px-4 sm:px-6 py-6 max-w-[1500px] w-full mx-auto">
 
+      <div id="empty-banner" class="empty:hidden mb-6"></div>
+
       <!-- ===== DASHBOARD ===== -->
       <section id="sec-dashboard" class="secao space-y-6">
-        <div id="empty-banner"></div>
         <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -472,15 +473,16 @@
   const BANCOS_SUGERIDOS = [...BANCOS_INICIAIS, 'C6 Bank', 'BTG Pactual', 'Rico', 'Clear', 'NuInvest', 'Mercado Pago', 'PicPay',
     'PagBank', 'Sicoob', 'Sicredi', 'Banrisul', 'Banco Pan', 'Neon', 'Next', 'Original', 'Safra', 'Modal', 'Genial Investimentos', 'Ágora', 'Toro Investimentos'];
 
-  const categoriasPadrao = () => [
-    { id: 'c-ali', nome: 'Alimentação', limite: 1500 },
-    { id: 'c-mor', nome: 'Moradia', limite: 2000 },
-    { id: 'c-tra', nome: 'Transporte', limite: 600 },
-    { id: 'c-con', nome: 'Contas', limite: 450 },
-    { id: 'c-sau', nome: 'Saúde', limite: 300 },
-    { id: 'c-laz', nome: 'Lazer', limite: 300 },
-    { id: 'c-edu', nome: 'Educação', limite: 150 },
-    { id: 'c-out', nome: 'Outros', limite: 200 },
+  // Sem limites por padrão: cada pessoa define os seus. O exemplo usa limites ilustrativos.
+  const categoriasPadrao = (comLimites = false) => [
+    { id: 'c-ali', nome: 'Alimentação', limite: comLimites ? 1500 : 0 },
+    { id: 'c-mor', nome: 'Moradia', limite: comLimites ? 2000 : 0 },
+    { id: 'c-tra', nome: 'Transporte', limite: comLimites ? 600 : 0 },
+    { id: 'c-con', nome: 'Contas', limite: comLimites ? 450 : 0 },
+    { id: 'c-sau', nome: 'Saúde', limite: comLimites ? 300 : 0 },
+    { id: 'c-laz', nome: 'Lazer', limite: comLimites ? 300 : 0 },
+    { id: 'c-edu', nome: 'Educação', limite: comLimites ? 150 : 0 },
+    { id: 'c-out', nome: 'Outros', limite: comLimites ? 200 : 0 },
   ];
 
   const defaults = () => ({
@@ -513,9 +515,8 @@
       const raw = localStorage.getItem(KEY);
       if (raw) return normalizar(JSON.parse(raw));
     } catch (e) { /* armazenamento indisponível */ }
-    // Primeira visita: abre com dados de exemplo, sinalizados no painel
-    const def = defaults();
-    return { ...exemplo(), config: { ...def.config, exemplo: true } };
+    // Primeira visita: painel vazio, pronto para os dados da pessoa
+    return defaults();
   }
 
   let state = load();
@@ -1008,22 +1009,27 @@
     </div>`;
   }
 
-  function renderDashboard() {
-    const r = resumo();
+  // Aviso no topo: dados de exemplo (em todas as seções) ou boas-vindas (só no Dashboard, com o painel vazio)
+  function renderBanner() {
     const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length;
     $('#empty-banner').innerHTML = state.config.exemplo && !vazio ? `
       <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"></i>
-          <div class="text-sm"><span class="font-semibold">Estes são dados de exemplo.</span> Explore à vontade; quando quiser, comece do zero com os seus números.</div></div>
-        <button data-action="zerar" class="btn-primary shrink-0">Começar do zero</button></div>` : vazio ? `
+          <div class="text-sm"><span class="font-semibold">Estes são dados de exemplo, não os seus.</span> Clique em “Começar do zero” para apagá-los e lançar os seus números.</div></div>
+        <button data-action="zerar" class="btn-primary shrink-0">Começar do zero</button></div>` : vazio && state.config.secao === 'dashboard' ? `
       <div class="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5"></i>
-          <div><div class="font-semibold">Comece cadastrando seus fundos</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300">Adicione fundos em Renda Fixa, lance aportes no Histórico e registre os saldos mensais. Ou carregue um exemplo para explorar.</div></div></div>
-        <div class="flex gap-2 shrink-0">
+          <div><div class="font-semibold">Seu painel está pronto para uso</div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">Lance seus gastos em Gastos Mensais e defina o limite de cada categoria. Para investimentos, cadastre os fundos em Renda Fixa.</div></div></div>
+        <div class="flex flex-wrap gap-2 shrink-0">
+          <button data-secao="gastos" class="btn-primary">Lançar gastos</button>
           <button data-secao="rendafixa" class="rounded-lg border border-emerald-600 text-emerald-700 dark:text-emerald-300 px-3 py-2 text-sm font-medium">Cadastrar fundo</button>
-          <button data-action="exemplo" class="btn-primary">Ver exemplo</button>
         </div></div>` : '';
+  }
+
+  function renderDashboard() {
+    const r = resumo();
+    renderBanner();
 
     const div = divDoAno(state.config.ano).reduce((s, d) => s + d.valor, 0);
     const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites();
@@ -1526,7 +1532,7 @@
   document.addEventListener('click', async e => {
     const sec = e.target.closest('[data-secao]');
     if (sec) {
-      state.config.secao = sec.dataset.secao; save(); renderNav(); lucide.createIcons();
+      state.config.secao = sec.dataset.secao; save(); renderNav(); renderBanner(); lucide.createIcons();
       const el = $('#sec-' + sec.dataset.secao); el.classList.remove('section-enter'); void el.offsetWidth; el.classList.add('section-enter');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -1668,7 +1674,7 @@
       if (m === 3 || m === 8) dividendos.push({ id: uid(), ativo: 'BBAS3', tipo: 'Ação', data: `${ano}-${pad(m + 1)}-22`, valor: m === 3 ? 87.3 : 64.9 });
     }
     // Gastos: modelos repetidos todo mês, com variação determinística
-    const categorias = categoriasPadrao();
+    const categorias = categoriasPadrao(true);
     let seed = 7;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const diaHoje = new Date().getDate();
