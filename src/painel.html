@@ -90,6 +90,7 @@
           </label>
           <button data-action="exportar" title="Exportar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="download" class="w-4 h-4"></i></button>
           <button data-action="importar" title="Importar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="upload" class="w-4 h-4"></i></button>
+          <button id="btn-nuvem" data-action="nuvem" class="hidden h-9 px-2.5 items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"></button>
           <button data-action="tema" title="Alternar tema claro/escuro" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
             <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i><i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
           </button>
@@ -397,7 +398,7 @@
         </label>
       </div>
       <div class="mt-8 flex flex-wrap gap-3 justify-between items-center text-xs text-slate-500 dark:text-slate-400">
-        <span class="flex items-center gap-1.5"><i data-lucide="hard-drive" class="w-3.5 h-3.5"></i> Dados salvos automaticamente neste navegador (localStorage).</span>
+        <span id="rodape-armazenamento" class="flex items-center gap-1.5"><i data-lucide="hard-drive" class="w-3.5 h-3.5"></i> Dados salvos automaticamente neste navegador.</span>
         <span class="flex flex-wrap gap-3">
           <button data-action="exportar" class="sm:hidden hover:text-emerald-600 underline underline-offset-2">Exportar backup</button>
           <button data-action="importar" class="sm:hidden hover:text-emerald-600 underline underline-offset-2">Importar backup</button>
@@ -522,7 +523,21 @@
   let state = load();
   let novoId = null; // destaca a linha recém-adicionada
 
+  // Parte do estado que vai para a nuvem: os dados e as preferências de cálculo.
+  // Ano, mês e seção abertos ficam só neste aparelho.
+  function dadosNuvem(s = state) {
+    return {
+      fundos: s.fundos, historico: s.historico, saldos: s.saldos, dividendos: s.dividendos,
+      gastos: s.gastos, categorias: s.categorias, bancos: s.bancos,
+      config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo },
+    };
+  }
+  let ultimaImpressao = JSON.stringify(dadosNuvem());
+
   function save() {
+    // Só conta como alteração (e sincroniza) quando os dados mudam, não ao trocar de seção ou de mês
+    const impressao = JSON.stringify(dadosNuvem());
+    if (impressao !== ultimaImpressao) { ultimaImpressao = impressao; nuvem.alterado(); }
     try { localStorage.setItem(KEY, JSON.stringify(state)); }
     catch (e) { toast('Não foi possível salvar no navegador. Exporte um backup.', 'error'); }
   }
@@ -1554,6 +1569,7 @@
       case 'del-saldo': removerComUndo('saldos', id, 'Saldo excluído'); break;
       case 'del-div': removerComUndo('dividendos', id, 'Dividendo excluído'); break;
       case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
+      case 'nuvem': nuvem.clique(); break;
       case 'edit-fundo': modalEditarFundo(id); break;
       case 'edit-gasto': editarGasto(id); break;
       case 'edit-hist': editarMov(id); break;
@@ -1709,12 +1725,276 @@
     return { fundos, historico, saldos, dividendos, gastos, categorias, bancos };
   }
 
+  // ---------- Sincronização na nuvem (Firebase) ----------
+  // Os dados ficam num documento por conta: usuarios/{uid} = { dados: JSON, atualizadoEm, dispositivo }.
+  // O localStorage continua sendo a cópia de trabalho; a nuvem é sincronizada em segundo plano.
+  const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyAOonPmKAPMscpK0tAncCRMXvBgy_waa4A',
+    authDomain: 'controle-financeiro-406b2.firebaseapp.com',
+    projectId: 'controle-financeiro-406b2',
+    storageBucket: 'controle-financeiro-406b2.firebasestorage.app',
+    messagingSenderId: '693083663102',
+    appId: '1:693083663102:web:e21dbb9f1e1ded55dd53af',
+  };
+  const FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
+  const META_KEY = 'controle-gastos-investimentos-sync';
+
+  const nuvem = (() => {
+    // pendente: há alteração deste aparelho ainda não enviada; sincronizadoEm: versão da nuvem com que ele está em dia.
+    // Não compara horários entre aparelhos (os relógios podem divergir): a versão serve só como identificador.
+    let meta = { pendente: false, sincronizadoEm: 0, uid: null };
+    try { meta = { ...meta, ...JSON.parse(localStorage.getItem(META_KEY) || '{}') }; } catch (e) {}
+    let seqAlteracao = 0, versaoEmEnvio = null;
+    const salvarMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} };
+
+    // Login com Google exige página própria em http(s): não funciona no arquivo local nem dentro de outra página
+    const disponivel = !!window.__painelTesteNuvem || (/^https?:$/.test(location.protocol) && window.self === window.top);
+    let fb = null, usuario = null, status = disponivel ? 'desconectado' : 'indisponivel', erroMsg = '';
+    let ultimaSync = null, timer = null, cancelarEscuta = null, reconciliando = false;
+
+    async function carregar() {
+      if (fb) return fb;
+      if (window.__painelTesteNuvem) return (fb = window.__painelTesteNuvem);
+      const [app, auth, fs] = await Promise.all(['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => import(FIREBASE_SDK + f)));
+      const a = app.initializeApp(FIREBASE_CONFIG);
+      fb = { auth: auth.getAuth(a), db: fs.getFirestore(a), GoogleAuthProvider: auth.GoogleAuthProvider,
+        signInWithPopup: auth.signInWithPopup, signOut: auth.signOut, onAuthStateChanged: auth.onAuthStateChanged,
+        doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc, onSnapshot: fs.onSnapshot };
+      return fb;
+    }
+
+    function setStatus(s, msg = '') { status = s; erroMsg = msg; desenhar(); }
+
+    function desenhar() {
+      const b = $('#btn-nuvem');
+      if (!b) return;
+      b.classList.toggle('hidden', status === 'indisponivel');
+      b.classList.toggle('inline-flex', status !== 'indisponivel');
+      const v = {
+        desconectado: ['cloud', 'text-slate-500 dark:text-slate-400', 'Entrar com Google', 'Entre para ver seus dados em todos os aparelhos'],
+        carregando: ['loader-circle', 'animate-spin text-slate-500', 'Conectando…', 'Conectando à nuvem'],
+        sincronizando: ['loader-circle', 'animate-spin text-sky-600 dark:text-sky-400', 'Sincronizando…', 'Enviando para a nuvem'],
+        pendente: ['cloud-upload', 'text-sky-600 dark:text-sky-400', 'Salvando…', 'Alteração aguardando envio'],
+        ok: ['cloud', 'text-emerald-600 dark:text-emerald-400', 'Sincronizado', 'Dados sincronizados com a nuvem'],
+        offline: ['cloud-off', 'text-amber-600 dark:text-amber-400', 'Sem internet', 'Sem internet: as alterações serão enviadas quando a conexão voltar'],
+        erro: ['triangle-alert', 'text-rose-600 dark:text-rose-400', 'Erro na nuvem', erroMsg || 'Erro na sincronização'],
+      }[status];
+      if (!v) return;
+      const [icone, cor, rotulo, dica] = v;
+      b.title = dica;
+      b.innerHTML = `<i data-lucide="${icone}" class="w-4 h-4 ${cor}"></i><span class="hidden sm:inline">${rotulo}</span>`;
+      lucide.createIcons();
+      const rod = $('#rodape-armazenamento');
+      if (rod) rod.lastChild.textContent = usuario ? ` Dados salvos neste navegador e sincronizados com a nuvem (${usuario.email}).` : ' Dados salvos automaticamente neste navegador.';
+    }
+
+    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length;
+    const nomeDispositivo = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'celular' : 'computador';
+
+    // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
+    function aplicar(dados) {
+      const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor };
+      state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
+      ultimaImpressao = JSON.stringify(dadosNuvem());
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      render();
+    }
+
+    // Junta dois conjuntos de dados por id (usado quando os dois lados mudaram)
+    function mesclar(local, remoto) {
+      const porId = campo => { const m = new Map(); for (const x of remoto[campo] || []) m.set(x.id, x); for (const x of local[campo] || []) m.set(x.id, x); return [...m.values()]; };
+      return {
+        fundos: porId('fundos'), historico: porId('historico'), saldos: porId('saldos'), dividendos: porId('dividendos'),
+        gastos: porId('gastos'), categorias: porId('categorias'),
+        bancos: [...new Set([...(remoto.bancos || []), ...(local.bancos || [])])],
+        config: { ...(remoto.config || {}), ...local.config, exemplo: false },
+      };
+    }
+
+    function marcarEmDia(versao) {
+      meta.sincronizadoEm = versao; meta.uid = usuario.uid;
+      salvarMeta(); ultimaSync = new Date(); setStatus(meta.pendente ? 'pendente' : 'ok');
+    }
+
+    async function enviar() {
+      clearTimeout(timer);
+      if (!usuario || !fb) return;
+      const versao = Math.max(Date.now(), meta.sincronizadoEm + 1);
+      const seq = seqAlteracao;
+      const json = JSON.stringify(dadosNuvem());
+      if (json.length > 900000) toast('Seus dados estão chegando ao limite de 1 MB da nuvem. Exporte um backup.', 'error');
+      setStatus('sincronizando');
+      versaoEmEnvio = versao;
+      try {
+        await fb.setDoc(fb.doc(fb.db, 'usuarios', usuario.uid), { dados: json, atualizadoEm: versao, dispositivo: nomeDispositivo() });
+        if (seq === seqAlteracao) meta.pendente = false; // nada mudou durante o envio
+        marcarEmDia(versao);
+        if (meta.pendente) agendar();
+      } catch (e) { tratarErro(e); }
+      finally { if (versaoEmEnvio === versao) versaoEmEnvio = null; }
+    }
+
+    function agendar() {
+      if (!usuario) return;
+      clearTimeout(timer);
+      setStatus(navigator.onLine ? 'pendente' : 'offline');
+      timer = setTimeout(enviar, 1200);
+    }
+
+    function perguntarConflito() {
+      return new Promise(res => abrirModal('Dados neste aparelho e na nuvem', `
+        <p>Este aparelho tem dados que ainda não estão na nuvem, e a sua conta já tem dados salvos de outro aparelho.</p>
+        <p class="mt-2"><strong>Juntar os dois</strong> mantém todos os lançamentos, sem apagar nada.</p>`, [
+        { label: 'Usar só os da nuvem', cls: btnSec, onClick: () => res('nuvem') },
+        { label: 'Usar só os deste aparelho', cls: btnSec, onClick: () => res('aparelho') },
+        { label: 'Juntar os dois', cls: 'btn-primary', cancelar: true, onClick: () => res('juntar') },
+      ]));
+    }
+
+    // Decide o que fazer com a versão da nuvem em relação à deste aparelho
+    async function reconciliar(remoto) {
+      reconciliando = true;
+      try {
+        if (meta.uid && meta.uid !== usuario.uid) meta = { pendente: true, sincronizadoEm: 0, uid: usuario.uid };
+        const local = dadosNuvem();
+        const usarNuvem = () => { meta.pendente = false; aplicar(remoto.dados); marcarEmDia(remoto.atualizadoEm); };
+        if (!remoto) { meta.pendente = true; await enviar(); return; } // conta nova: a nuvem recebe este aparelho
+
+        if (!meta.sincronizadoEm) { // primeira sincronização deste aparelho com esta conta
+          if (vazio(local) || local.config.exemplo || JSON.stringify(local) === JSON.stringify(remoto.dados)) return usarNuvem();
+          const escolha = await perguntarConflito();
+          if (escolha === 'nuvem') return usarNuvem();
+          if (escolha === 'juntar') aplicar(mesclar(local, remoto.dados));
+          meta.pendente = true; meta.sincronizadoEm = remoto.atualizadoEm; await enviar();
+          toast(escolha === 'juntar' ? 'Dados juntados e salvos na nuvem' : 'Dados deste aparelho salvos na nuvem');
+          return;
+        }
+
+        const mudouLocal = meta.pendente;
+        const mudouNuvem = remoto.atualizadoEm !== meta.sincronizadoEm;
+        if (mudouNuvem && !mudouLocal) { usarNuvem(); toast('Dados atualizados de outro aparelho', 'info'); }
+        else if (mudouLocal && !mudouNuvem) await enviar();
+        else if (mudouLocal && mudouNuvem) {
+          aplicar(mesclar(local, remoto.dados));
+          meta.sincronizadoEm = remoto.atualizadoEm; seqAlteracao++;
+          await enviar();
+          toast('Alterações deste e de outro aparelho foram juntadas', 'info');
+        }
+        else marcarEmDia(meta.sincronizadoEm);
+      } finally { reconciliando = false; }
+    }
+
+    const lerRemoto = snap => snap.exists() ? { dados: JSON.parse(snap.data().dados), atualizadoEm: snap.data().atualizadoEm || 0 } : null;
+
+    async function conectar(u) {
+      usuario = u;
+      setStatus('carregando');
+      const ref = fb.doc(fb.db, 'usuarios', u.uid);
+      try {
+        await reconciliar(lerRemoto(await fb.getDoc(ref)));
+      } catch (e) { tratarErro(e); }
+      // Recebe em tempo real o que outros aparelhos salvarem
+      cancelarEscuta?.();
+      cancelarEscuta = fb.onSnapshot(ref, snap => {
+        if (snap.metadata?.hasPendingWrites || reconciliando || !snap.exists()) return;
+        const v = snap.data().atualizadoEm || 0;
+        if (v === meta.sincronizadoEm || v === versaoEmEnvio) return; // eco do próprio envio
+        reconciliar(lerRemoto(snap)).catch(tratarErro);
+      }, tratarErro);
+    }
+
+    function desconectar() {
+      cancelarEscuta?.(); cancelarEscuta = null; usuario = null; clearTimeout(timer);
+      setStatus('desconectado');
+    }
+
+    function tratarErro(e) {
+      const code = e?.code || '';
+      if (code === 'unavailable' || code === 'auth/network-request-failed' || !navigator.onLine) return setStatus('offline');
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return setStatus(usuario ? 'ok' : 'desconectado');
+      const msgs = {
+        'permission-denied': 'A nuvem recusou o acesso. Confira se as regras do Firestore foram publicadas.',
+        'not-found': 'O banco de dados ainda não foi criado no Firebase (Firestore Database).',
+        'auth/operation-not-allowed': 'O login com Google não está ativado no Firebase (Authentication → Método de login).',
+        'auth/unauthorized-domain': 'Este endereço não está autorizado no Firebase (Authentication → Configurações → Domínios autorizados).',
+        'auth/popup-blocked': 'O navegador bloqueou a janela de login. Permita pop-ups para este site e tente de novo.',
+      };
+      const msg = msgs[code] || `Erro na sincronização: ${e?.message || code || e}`;
+      console.warn('[nuvem]', code, e);
+      toast(msg, 'error');
+      setStatus(usuario ? 'erro' : 'desconectado', msg);
+    }
+
+    async function iniciar(forcar = false) {
+      if (!disponivel) return desenhar();
+      // Só baixa o Firebase se a pessoa já entrou antes (ou clicou em Entrar)
+      if (!meta.uid && !forcar) return desenhar();
+      setStatus('carregando');
+      try {
+        await carregar();
+        await new Promise(res => {
+          let primeira = true;
+          fb.onAuthStateChanged(fb.auth, u => {
+            if (u) conectar(u); else desconectar();
+            if (primeira) { primeira = false; res(); }
+          });
+        });
+      } catch (e) { tratarErro(e); }
+    }
+
+    async function entrar() {
+      try {
+        if (!fb) await iniciar(true);
+        if (usuario) return;
+        setStatus('carregando');
+        await fb.signInWithPopup(fb.auth, new fb.GoogleAuthProvider());
+      } catch (e) { tratarErro(e); }
+    }
+
+    function painelConta() {
+      const quando = ultimaSync ? ultimaSync.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      const situacao = { ok: 'Tudo sincronizado', pendente: 'Alteração aguardando envio', sincronizando: 'Enviando…', offline: 'Sem internet: envio quando a conexão voltar', erro: erroMsg, carregando: 'Conectando…' }[status] || '';
+      abrirModal('Sincronização na nuvem', `
+        <div class="flex items-center gap-3">
+          ${usuario.photoURL ? `<img src="${esc(usuario.photoURL)}" alt="" class="h-10 w-10 rounded-full" referrerpolicy="no-referrer">` : ''}
+          <div class="min-w-0"><div class="font-medium text-slate-800 dark:text-slate-100 truncate">${esc(usuario.displayName || '')}</div>
+            <div class="text-xs truncate">${esc(usuario.email || '')}</div></div>
+        </div>
+        <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dt class="text-slate-500 dark:text-slate-400">Situação</dt><dd>${esc(situacao)}</dd>
+          <dt class="text-slate-500 dark:text-slate-400">Última sincronização</dt><dd class="num">${quando}</dd>
+        </dl>
+        <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Em outro aparelho, abra este mesmo endereço e entre com a mesma conta Google. Ao sair, os dados continuam neste aparelho.</p>`, [
+        { label: 'Sair', cls: btnSec, onClick: async () => { await fb.signOut(fb.auth); toast('Você saiu. Os dados continuam neste aparelho.', 'info'); } },
+        { label: 'Fechar', cls: btnSec, cancelar: true },
+        { label: 'Sincronizar agora', cls: 'btn-primary', onClick: async () => {
+          try { await reconciliar(lerRemoto(await fb.getDoc(fb.doc(fb.db, 'usuarios', usuario.uid)))); if (status === 'ok') toast('Sincronizado'); }
+          catch (e) { tratarErro(e); }
+        } },
+      ]);
+    }
+
+    window.addEventListener('online', () => { if (usuario && meta.pendente) enviar(); else if (usuario) setStatus('ok'); });
+    window.addEventListener('offline', () => { if (usuario) setStatus('offline'); });
+
+    return {
+      iniciar,
+      clique() { if (!usuario) entrar(); else painelConta(); },
+      // Chamado por save() quando os dados mudam: marca e agenda o envio
+      alterado() {
+        meta.pendente = true; seqAlteracao++; salvarMeta();
+        agendar();
+      },
+    };
+  })();
+
   // ---------- Inicialização ----------
   $('#form-hist [name=data]').value = hoje();
   $('#form-div [name=data]').value = hoje();
   $('#form-saldo [name=mes]').value = mesAnterior();
   syncDataGasto();
   render();
+  nuvem.iniciar();
 })();
 </script>
 </body>
