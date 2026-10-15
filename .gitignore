@@ -1,0 +1,11 @@
+# Dados pessoais: nunca publicar
+*.json
+*.xlsx
+!package.json
+
+# Cópia local usada para o Netlify
+index/
+
+# Arquivos temporários do build
+src/.tailwind.tmp.css
+node_modules/

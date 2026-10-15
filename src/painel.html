@@ -1,0 +1,1706 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Investimentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Tema: escolha feita no painel > data-theme do visualizador > preferência do sistema
+  (function () {
+    const root = document.documentElement, mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function aplicar() {
+      let t = null;
+      try { t = localStorage.getItem('cgi-tema'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = root.getAttribute('data-theme');
+      if (t !== 'dark' && t !== 'light') t = mq.matches ? 'dark' : 'light';
+      root.classList.toggle('dark', t === 'dark');
+    }
+    window.__aplicarTema = aplicar;
+    aplicar();
+    mq.addEventListener('change', aplicar);
+    new MutationObserver(() => { try { localStorage.removeItem('cgi-tema'); } catch (e) {} aplicar(); })
+      .observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+</script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style id="tailwind">/*TAILWIND*/</style>
+<style>
+  /* Fundo da página por token, para os dois temas */
+  :root { --bg: #f8fafc; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #020617; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #020617; color-scheme: dark; }
+  :root.dark { --bg: #020617; color-scheme: dark; }
+  :root:not(.dark) { --bg: #f8fafc; color-scheme: light; }
+  body { background: var(--bg); font-feature-settings: "tnum" 1; }
+  #topo { top: env(safe-area-inset-top, 0px); }
+  #toasts { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+  .num { font-variant-numeric: tabular-nums; }
+  @keyframes rowIn { from { background-color: rgba(16,185,129,.28); } to { background-color: transparent; } }
+  #tbl-matriz th, #tbl-matriz td, #tbl-divmatriz th, #tbl-divmatriz td { padding-left: .6rem; padding-right: .6rem; }
+  .row-new > td { animation: rowIn 1.8s ease-out; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .toast { animation: toastIn .22s ease-out; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .section-enter { animation: fadeUp .25s ease-out; }
+  .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 8px; }
+  input[type="month"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: .6; cursor: pointer; }
+  .dark input[type="month"]::-webkit-calendar-picker-indicator,
+  .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+</style>
+</head>
+<body>
+<div id="app" class="overflow-x-hidden text-slate-800 dark:text-slate-100 antialiased min-h-screen">
+
+<div class="flex min-h-screen">
+  <!-- Sidebar (desktop) -->
+  <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div class="px-5 py-5 flex items-center gap-3 border-b border-slate-200 dark:border-slate-800">
+      <div class="h-9 w-9 rounded-lg bg-emerald-600 text-white grid place-items-center"><i data-lucide="line-chart" class="w-5 h-5"></i></div>
+      <div>
+        <div class="font-semibold leading-tight">Controle Financeiro</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Gastos &amp; Investimentos</div>
+      </div>
+    </div>
+    <nav id="nav-desktop" class="flex-1 p-3 space-y-1"></nav>
+    <div class="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+      <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Alíquota de IR estimada (%)
+        <input id="cfg-ir" type="text" inputmode="decimal" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </label>
+      <p class="text-[11px] leading-snug text-slate-500 dark:text-slate-400">Aplicada sobre o lucro positivo dos fundos tributáveis para calcular o Lucro Líquido.</p>
+    </div>
+  </aside>
+
+  <div class="flex-1 min-w-0 flex flex-col">
+    <!-- Topbar -->
+    <header id="topo" class="sticky z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <div class="px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div class="lg:hidden h-8 w-8 rounded-lg bg-emerald-600 text-white grid place-items-center shrink-0"><i data-lucide="line-chart" class="w-4 h-4"></i></div>
+        <div class="min-w-0">
+          <h1 id="titulo-secao" class="font-semibold text-lg truncate">Dashboard</h1>
+          <p id="sub-secao" class="text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block"></p>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <label class="flex items-center gap-2 text-sm">
+            <span class="hidden sm:inline text-slate-500 dark:text-slate-400">Ano</span>
+            <select id="sel-ano" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+          </label>
+          <button data-action="exportar" title="Exportar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="download" class="w-4 h-4"></i></button>
+          <button data-action="importar" title="Importar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="upload" class="w-4 h-4"></i></button>
+          <button data-action="tema" title="Alternar tema claro/escuro" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i><i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+          </button>
+          <input id="file-import" type="file" accept="application/json,.json" class="hidden">
+        </div>
+      </div>
+      <!-- Nav mobile -->
+      <nav id="nav-mobile" class="lg:hidden flex gap-1 overflow-x-auto scroll-thin px-4 pb-2"></nav>
+    </header>
+
+    <main class="flex-1 px-4 sm:px-6 py-6 max-w-[1500px] w-full mx-auto">
+
+      <!-- ===== DASHBOARD ===== -->
+      <section id="sec-dashboard" class="secao space-y-6">
+        <div id="empty-banner"></div>
+        <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <div class="flex items-start justify-between gap-3 mb-1">
+              <div>
+                <h2 class="font-semibold">Resultado mensal</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Lucro da renda fixa + dividendos em <span class="ano-label"></span></p>
+              </div>
+              <div id="chart-total" class="text-right"></div>
+            </div>
+            <div id="chart" class="relative mt-3"></div>
+          </div>
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <div class="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 class="font-semibold">Distribuição do patrimônio</h2>
+                <p id="dist-sub" class="text-xs text-slate-500 dark:text-slate-400">Valor atual por fundo/conta</p>
+              </div>
+              <div id="dist-toggle" class="inline-flex shrink-0 rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 text-xs font-medium"></div>
+            </div>
+            <div id="distribuicao" class="space-y-3"></div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 class="font-semibold">Orçamento de <span id="dash-mes-label"></span></h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Gasto por categoria comparado ao limite mensal</p>
+            </div>
+            <button data-secao="gastos" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 shrink-0">Ver gastos <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+          </div>
+          <div id="dash-orcamento" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-x-8 gap-y-5"></div>
+        </div>
+      </section>
+
+      <!-- ===== GASTOS MENSAIS ===== -->
+      <section id="sec-gastos" class="secao space-y-6 hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <button data-action="mes-ant" title="Mês anterior" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <select id="sel-mes-gastos" aria-label="Mês" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+            <button data-action="mes-prox" title="Próximo mês" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+          </div>
+          <div id="gastos-kpis" class="flex flex-wrap gap-x-6 gap-y-1 text-sm"></div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+              <h2 class="font-semibold">Orçamento por categoria</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Gasto do mês comparado ao limite mensal. Edite o limite direto na tabela.</p>
+            </div>
+            <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-orcamento"></table></div>
+            <form id="form-cat" class="px-5 py-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+              <label class="text-sm">Nova categoria
+                <input name="nome" required placeholder="Ex.: Pets" class="inp">
+              </label>
+              <label class="text-sm">Limite mensal (R$)
+                <input name="limite" inputmode="decimal" placeholder="0,00" class="inp num">
+              </label>
+              <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Criar categoria</button>
+            </form>
+          </div>
+          <div class="space-y-6 min-w-0">
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="receipt" class="w-4 h-4 text-emerald-600"></i> Novo gasto</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">O gasto entra no mês da data informada.</p>
+            <form id="form-gasto" class="grid gap-3">
+              <label class="text-sm">Data
+                <input name="data" type="date" required class="inp">
+              </label>
+              <label class="text-sm">Categoria
+                <select name="categoria" required class="inp sel-categoria"></select>
+              </label>
+              <label class="text-sm">Banco / conta de pagamento
+                <select name="banco" data-opcional class="inp sel-banco"></select>
+              </label>
+              <label class="text-sm">Descrição
+                <input name="descricao" placeholder="Ex.: Supermercado" class="inp">
+              </label>
+              <label class="text-sm">Valor (R$)
+                <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              </label>
+              <button class="btn-primary w-full mt-1"><i data-lucide="plus" class="w-4 h-4"></i> Lançar gasto</button>
+            </form>
+          </div>
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="building-2" class="w-4 h-4 text-emerald-600"></i> Gastos por banco</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">De onde saiu o dinheiro neste mês</p>
+            <div id="gastos-por-banco" class="space-y-3"></div>
+          </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <h2 class="font-semibold">Gastos de <span id="gastos-mes-label"></span></h2>
+            <span id="gastos-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+          </div>
+          <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-gastos"></table></div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="font-semibold">Gastos por categoria — <span class="ano-label"></span></h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Valores em vermelho ultrapassaram o limite mensal da categoria.</p>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-gastos-matriz"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== BANCOS ===== -->
+      <section id="sec-bancos" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i> Novo banco / corretora</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Os bancos cadastrados aparecem nos formulários de Renda Fixa e de Gastos Mensais.</p>
+          <form id="form-banco" class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end max-w-xl">
+            <label class="text-sm">Nome
+              <input name="nome" required list="lista-bancos" placeholder="Ex.: Itaú" class="inp">
+            </label>
+            <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Adicionar banco</button>
+          </form>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="font-semibold">Consolidado por banco</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Investimentos atuais e gastos de <span id="bancos-mes-label"></span>. Um banco só pode ser excluído quando não tiver fundos nem gastos vinculados.</p>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-bancos"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== RENDA FIXA ===== -->
+      <section id="sec-rendafixa" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i> Novo fundo / conta</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Cadastre o ativo. Valor investido e rendido são calculados a partir do Histórico e dos Saldos Mensais.</p>
+          <form id="form-fundo" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_2fr_auto_auto] gap-3 items-end">
+            <label class="text-sm">Fundo / Conta
+              <input name="nome" required placeholder="Ex.: CDB 110% CDI" class="inp">
+            </label>
+            <label class="text-sm">Banco / Corretora
+              <select name="banco" required class="inp sel-banco"></select>
+            </label>
+            <label class="text-sm flex items-center gap-2 h-[38px] select-none cursor-pointer">
+              <input name="isento" type="checkbox" class="h-4 w-4 accent-emerald-600"> Isento de IR (LCI/LCA)
+            </label>
+            <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Adicionar</button>
+          </form>
+          <datalist id="lista-bancos"></datalist>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <h2 class="font-semibold">Ativos de Renda Fixa</h2>
+            <span id="rf-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-rf"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== HISTÓRICO ===== -->
+      <section id="sec-historico" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-600"></i> Nova movimentação</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Aportes entram como valor positivo; resgates são gravados como negativo.</p>
+          <div class="need-fundo"></div>
+          <form id="form-hist" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 items-end">
+            <label class="text-sm">Fundo
+              <select name="fundo" required class="inp sel-fundo"></select>
+              <span class="hint-banco block text-[11px] text-slate-500 dark:text-slate-400 mt-1 h-4"></span>
+            </label>
+            <label class="text-sm">Data
+              <input name="data" type="date" required class="inp">
+              <span class="block h-4 mt-1"></span>
+            </label>
+            <label class="text-sm">Tipo
+              <select name="tipo" class="inp"><option value="aporte">Aporte (+)</option><option value="resgate">Resgate (−)</option></select>
+              <span class="block h-4 mt-1"></span>
+            </label>
+            <label class="text-sm">Valor (R$)
+              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              <span class="block h-4 mt-1"></span>
+            </label>
+            <div><button class="btn-primary w-full"><i data-lucide="plus" class="w-4 h-4"></i> Lançar</button><span class="block h-4 mt-1"></span></div>
+          </form>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center justify-between">
+            <h2 class="font-semibold">Histórico de aportes e resgates</h2>
+            <select id="filtro-hist" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 text-sm"></select>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-hist"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== SALDOS ===== -->
+      <section id="sec-saldos" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i> Registrar saldo de fim de mês</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Informe o saldo total da conta no fim do mês. Se já existir um saldo para o mesmo fundo e mês, ele será atualizado.</p>
+          <div class="need-fundo"></div>
+          <form id="form-saldo" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1fr_auto] gap-3 items-end">
+            <label class="text-sm">Mês de referência
+              <input name="mes" type="month" required class="inp">
+            </label>
+            <label class="text-sm">Fundo
+              <select name="fundo" required class="inp sel-fundo"></select>
+            </label>
+            <label class="text-sm">Saldo total (R$)
+              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+            </label>
+            <button class="btn-primary"><i data-lucide="save" class="w-4 h-4"></i> Salvar saldo</button>
+          </form>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center justify-between">
+            <h2 class="font-semibold">Saldos mensais das contas</h2>
+            <select id="filtro-saldo" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 text-sm"></select>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-saldo"></table></div>
+        </div>
+      </section>
+
+      <!-- ===== RESUMO DO LUCRO ===== -->
+      <section id="sec-lucro" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center justify-between">
+            <div>
+              <h2 class="font-semibold">Resumo do Lucro — <span class="ano-label"></span></h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Lucro do mês = Saldo do mês − Aportes do mês − Saldo do mês anterior. Passe o mouse sobre uma célula para ver o cálculo.</p>
+            </div>
+            <label class="flex items-center gap-3 text-sm cursor-pointer select-none">
+              <span class="text-slate-600 dark:text-slate-300">Exibir quedas como zero</span>
+              <button type="button" id="tgl-neg" role="switch" class="relative h-6 w-11 rounded-full transition-colors"><span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"></span></button>
+            </label>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-matriz"></table></div>
+        </div>
+        <div class="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          <strong class="text-slate-700 dark:text-slate-200">Como o cálculo funciona.</strong>
+          Para cada fundo e mês com saldo registrado: <em>Lucro = Saldo atual − Aportes/resgates do período − Saldo anterior</em>.
+          No primeiro mês de vida do fundo (sem saldo anterior), subtrai-se apenas o que foi investido até aquele mês.
+          Se faltar o saldo de algum mês intermediário, o cálculo usa o último saldo conhecido e soma os aportes de todo o intervalo, para que nenhum lucro seja contado em dobro.
+          Meses sem saldo aparecem como “—”.
+        </div>
+      </section>
+
+      <!-- ===== DIVIDENDOS ===== -->
+      <section id="sec-dividendos" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="coins" class="w-4 h-4 text-emerald-600"></i> Lançar dividendo / rendimento</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">FIIs, ações, BDRs e ETFs. Os valores alimentam a matriz mensal abaixo e o card de Dividendos.</p>
+          <form id="form-div" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-3 items-end">
+            <label class="text-sm">Ativo (ticker)
+              <input name="ativo" required placeholder="Ex.: MXRF11" list="lista-ativos" class="inp uppercase">
+            </label>
+            <label class="text-sm">Tipo
+              <select name="tipo" class="inp"><option>FII</option><option>Ação</option><option>BDR</option><option>ETF</option></select>
+            </label>
+            <label class="text-sm">Data de pagamento
+              <input name="data" type="date" required class="inp">
+            </label>
+            <label class="text-sm">Valor (R$)
+              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+            </label>
+            <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Lançar</button>
+          </form>
+          <datalist id="lista-ativos"></datalist>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="font-semibold">Resumo de Dividendos — <span class="ano-label"></span></h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Valores recebidos por ativo, mês a mês</p>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-divmatriz"></table></div>
+        </div>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <h2 class="font-semibold">Lançamentos de <span class="ano-label"></span></h2>
+            <span id="div-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+          </div>
+          <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-div"></table></div>
+        </div>
+      </section>
+
+      <div class="lg:hidden mt-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Alíquota de IR estimada (%)
+          <input id="cfg-ir-m" type="text" inputmode="decimal" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100">
+        </label>
+      </div>
+      <div class="mt-8 flex flex-wrap gap-3 justify-between items-center text-xs text-slate-500 dark:text-slate-400">
+        <span class="flex items-center gap-1.5"><i data-lucide="hard-drive" class="w-3.5 h-3.5"></i> Dados salvos automaticamente neste navegador (localStorage).</span>
+        <span class="flex flex-wrap gap-3">
+          <button data-action="exportar" class="sm:hidden hover:text-emerald-600 underline underline-offset-2">Exportar backup</button>
+          <button data-action="importar" class="sm:hidden hover:text-emerald-600 underline underline-offset-2">Importar backup</button>
+          <button data-action="exemplo" class="hover:text-emerald-600 underline underline-offset-2">Carregar dados de exemplo</button>
+          <button data-action="limpar" class="hover:text-rose-600 underline underline-offset-2">Apagar todos os dados</button>
+        </span>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="tooltip" class="pointer-events-none fixed z-50 hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg px-3 py-2 text-xs"></div>
+<div id="toasts" class="fixed right-4 left-4 sm:left-auto z-50 flex flex-col gap-2 items-stretch sm:items-end"></div>
+
+<!-- Janela modal (confirmações e backup) -->
+<div id="modal" class="hidden fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm items-center justify-center p-4">
+  <div role="dialog" aria-modal="true" aria-labelledby="modal-titulo" class="w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-5">
+    <h3 id="modal-titulo" class="font-semibold text-lg"></h3>
+    <div id="modal-corpo" class="mt-2 text-sm text-slate-600 dark:text-slate-300"></div>
+    <div id="modal-acoes" class="mt-5 flex flex-wrap justify-end gap-2"></div>
+  </div>
+</div>
+</div>
+
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Constantes e utilitários ----------
+  const KEY = 'controle-gastos-investimentos-v1';
+  const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const MESES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const SECOES = [
+    { id: 'dashboard', nome: 'Dashboard', icon: 'layout-dashboard', sub: 'Visão executiva do seu patrimônio' },
+    { id: 'gastos', nome: 'Gastos Mensais', icon: 'receipt', sub: 'Orçamento por categoria, mês a mês' },
+    { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro' },
+    { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo' },
+    { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês' },
+    { id: 'lucro', nome: 'Resumo do Lucro', icon: 'table', sub: 'Matriz mensal de lucro por fundo' },
+    { id: 'dividendos', nome: 'Dividendos', icon: 'coins', sub: 'Proventos de FIIs e ações mês a mês' },
+    { id: 'bancos', nome: 'Bancos', icon: 'building-2', sub: 'Investimentos e gastos consolidados por banco' },
+  ];
+  const EPS = 0.005;
+
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const pad = n => String(n).padStart(2, '0');
+  const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const brl = v => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const num = v => (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = v => (isFinite(v) ? (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00') + '%';
+  const sign = v => (v > EPS ? '+' : '');
+  const tone = v => v > EPS ? 'text-emerald-600 dark:text-emerald-400' : v < -EPS ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400';
+  const mesDe = d => d.slice(0, 7);
+  const fmtData = d => { const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
+  const fmtMes = ym => { const [y, m] = ym.split('-'); return `${MESES_FULL[+m - 1]} / ${y}`; };
+  const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const mesAnterior = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const round2 = v => Math.round(v * 100) / 100;
+
+  function parseValor(s) {
+    s = String(s ?? '').trim().replace(/[R$\s]/g, '');
+    if (!s) return NaN;
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); // "1.500" = mil e quinhentos
+    return Number(s);
+  }
+
+  // ---------- Estado e persistência ----------
+  const BANCOS_INICIAIS = ['Nubank', 'Itaú', 'Banco do Brasil', 'Caixa', 'Bradesco', 'Santander', 'Banco Inter', 'XP Investimentos'];
+  const BANCOS_SUGERIDOS = [...BANCOS_INICIAIS, 'C6 Bank', 'BTG Pactual', 'Rico', 'Clear', 'NuInvest', 'Mercado Pago', 'PicPay',
+    'PagBank', 'Sicoob', 'Sicredi', 'Banrisul', 'Banco Pan', 'Neon', 'Next', 'Original', 'Safra', 'Modal', 'Genial Investimentos', 'Ágora', 'Toro Investimentos'];
+
+  const categoriasPadrao = () => [
+    { id: 'c-ali', nome: 'Alimentação', limite: 1500 },
+    { id: 'c-mor', nome: 'Moradia', limite: 2000 },
+    { id: 'c-tra', nome: 'Transporte', limite: 600 },
+    { id: 'c-con', nome: 'Contas', limite: 450 },
+    { id: 'c-sau', nome: 'Saúde', limite: 300 },
+    { id: 'c-laz', nome: 'Lazer', limite: 300 },
+    { id: 'c-edu', nome: 'Educação', limite: 150 },
+    { id: 'c-out', nome: 'Outros', limite: 200 },
+  ];
+
+  const defaults = () => ({
+    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
+    config: { ano: new Date().getFullYear(), mesGastos: new Date().getMonth() + 1, mostrarNegativo: true, aliquotaIR: 15, secao: 'dashboard', exemplo: false, distPor: 'fundo' },
+  });
+
+  // Garante que todo banco usado em fundos ou gastos está no cadastro
+  function sincronizarBancos(s) {
+    const set = new Set(s.bancos);
+    s.fundos.forEach(f => f.banco && set.add(f.banco));
+    s.gastos.forEach(g => g.banco && set.add(g.banco));
+    s.bancos = [...set];
+    return s;
+  }
+
+  // Normaliza dados salvos ou importados (backups antigos não têm gastos/categorias)
+  function normalizar(d) {
+    const def = defaults(), arr = v => Array.isArray(v) ? v : [];
+    return sincronizarBancos({
+      fundos: arr(d.fundos), historico: arr(d.historico), saldos: arr(d.saldos), dividendos: arr(d.dividendos),
+      gastos: arr(d.gastos), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
+      bancos: Array.isArray(d.bancos) ? d.bancos : def.bancos,
+      config: { ...def.config, ...(d.config || {}) },
+    });
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return normalizar(JSON.parse(raw));
+    } catch (e) { /* armazenamento indisponível */ }
+    // Primeira visita: abre com dados de exemplo, sinalizados no painel
+    const def = defaults();
+    return { ...exemplo(), config: { ...def.config, exemplo: true } };
+  }
+
+  let state = load();
+  let novoId = null; // destaca a linha recém-adicionada
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { toast('Não foi possível salvar no navegador. Exporte um backup.', 'error'); }
+  }
+
+  function commit(id) { novoId = id || null; save(); render(); }
+
+  // ---------- Toasts ----------
+  function toast(msg, tipo = 'success', undo) {
+    const cores = {
+      success: ['circle-check', 'text-emerald-600 dark:text-emerald-400'],
+      error: ['circle-alert', 'text-rose-600 dark:text-rose-400'],
+      info: ['info', 'text-sky-600 dark:text-sky-400'],
+    }[tipo];
+    const el = document.createElement('div');
+    el.className = 'toast flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg px-4 py-3 text-sm sm:min-w-[300px] max-w-md';
+    el.innerHTML = `<i data-lucide="${cores[0]}" class="w-5 h-5 shrink-0 ${cores[1]}"></i><span class="flex-1">${esc(msg)}</span>` +
+      (undo ? `<button class="undo font-semibold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"><i data-lucide="undo-2" class="w-4 h-4"></i>Desfazer</button>` : '');
+    $('#toasts').appendChild(el);
+    lucide.createIcons({ nodes: [el] });
+    const close = () => { el.style.transition = 'opacity .2s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 200); };
+    if (undo) $('.undo', el).addEventListener('click', () => { undo(); close(); toast('Ação desfeita', 'info'); });
+    setTimeout(close, undo ? 6000 : 3200);
+  }
+
+  // ---------- Janela modal ----------
+  const btnSec = 'rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800';
+  const btnPerigo = 'rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 text-sm font-medium';
+
+  let fecharModalAtual = null;
+
+  function abrirModal(titulo, corpoHtml, acoes) {
+    fecharModalAtual?.();
+    const m = $('#modal');
+    $('#modal-titulo').textContent = titulo;
+    $('#modal-corpo').innerHTML = corpoHtml;
+    const box = $('#modal-acoes');
+    box.innerHTML = '';
+    const fechar = () => { m.classList.add('hidden'); m.classList.remove('flex'); document.removeEventListener('keydown', onKey); m.onclick = null; fecharModalAtual = null; };
+    const cancelar = () => { fechar(); acoes.find(a => a.cancelar)?.onClick?.(); };
+    const onKey = e => { if (e.key === 'Escape') cancelar(); };
+    m.onclick = e => { if (e.target === m) cancelar(); }; // clique fora da janela cancela
+    fecharModalAtual = fechar;
+    for (const a of acoes) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = a.cls; b.innerHTML = a.label;
+      b.addEventListener('click', async () => { const manter = await a.onClick?.(); if (manter !== true) fechar(); });
+      box.appendChild(b);
+    }
+    m.classList.remove('hidden'); m.classList.add('flex');
+    document.addEventListener('keydown', onKey);
+    lucide.createIcons({ nodes: [m] });
+    // Enter dentro de um formulário da janela aciona o botão principal
+    $('#modal-corpo form')?.addEventListener('submit', e => { e.preventDefault(); box.lastElementChild.click(); });
+    ($('#modal-corpo input:not([type=checkbox]), #modal-corpo select') || box.lastElementChild || box).focus();
+    return fechar;
+  }
+
+  function confirmar(titulo, msg, rotulo = 'Confirmar') {
+    return new Promise(res => abrirModal(titulo, `<p>${esc(msg)}</p>`, [
+      { label: 'Cancelar', cls: btnSec, cancelar: true, onClick: () => res(false) },
+      { label: rotulo, cls: btnPerigo, onClick: () => res(true) },
+    ]));
+  }
+
+  function modalEditarFundo(id) {
+    const f = fundoById(id);
+    if (!f) return;
+    const opts = bancosOrdenados().map(b => `<option value="${esc(b)}" ${b === f.banco ? 'selected' : ''}>${esc(b)}</option>`).join('');
+    abrirModal('Editar fundo', `
+      <form class="grid gap-3 text-slate-800 dark:text-slate-100">
+        <label class="text-sm">Fundo / Conta <input id="m-nome" required value="${esc(f.nome)}" class="inp"></label>
+        <label class="text-sm">Banco / Corretora <select id="m-banco" class="inp">${opts}</select></label>
+        <label class="text-sm flex items-center gap-2 select-none cursor-pointer"><input id="m-isento" type="checkbox" ${f.isento ? 'checked' : ''} class="h-4 w-4 accent-emerald-600"> Isento de IR (LCI/LCA)</label>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Movimentações e saldos continuam vinculados a este fundo.</p>
+      </form>`, [
+      { label: 'Cancelar', cls: btnSec, cancelar: true },
+      { label: 'Salvar', cls: 'btn-primary', onClick: () => {
+        const nome = $('#m-nome').value.trim(), banco = $('#m-banco').value, isento = $('#m-isento').checked;
+        if (!nome) { invalido($('#m-nome'), 'Informe o nome do fundo.'); return true; }
+        if (!banco) { invalido($('#m-banco'), 'Cadastre um banco em Bancos antes.'); return true; }
+        if (state.fundos.some(x => x.id !== id && x.nome.toLowerCase() === nome.toLowerCase() && x.banco === banco)) {
+          invalido($('#m-nome'), 'Já existe um fundo com esse nome neste banco.'); return true;
+        }
+        const antes = { ...f };
+        Object.assign(f, { nome, banco, isento });
+        commit(id);
+        toast(`Fundo “${nome}” atualizado`, 'success', () => { Object.assign(f, antes); commit(id); });
+      } },
+    ]);
+  }
+
+  // Janela de edição genérica: campos -> valores -> salvar(v) devolve [campo, erro] ou nada
+  function modalForm(titulo, campos, salvar) {
+    const html = campos.map(c => {
+      const id = 'm-' + c.id;
+      let ctl;
+      if (c.type === 'select') ctl = `<select id="${id}" class="inp">${c.options.map(([v, t]) => `<option value="${esc(v)}" ${v === c.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+      else if (c.type === 'valor') ctl = `<input id="${id}" inputmode="decimal" value="${num(c.value)}" class="inp num">`;
+      else ctl = `<input id="${id}" type="${c.type || 'text'}" value="${esc(c.value ?? '')}" ${c.list ? `list="${c.list}"` : ''} class="inp">`;
+      return `<label class="text-sm">${esc(c.label)}${ctl}</label>`;
+    }).join('');
+    abrirModal(titulo, `<form class="grid gap-3 text-slate-800 dark:text-slate-100">${html}</form>`, [
+      { label: 'Cancelar', cls: btnSec, cancelar: true },
+      { label: 'Salvar', cls: 'btn-primary', onClick: () => {
+        const v = {};
+        for (const c of campos) { const el = $('#m-' + c.id); v[c.id] = c.type === 'valor' ? parseValor(el.value) : el.value.trim(); }
+        const erro = salvar(v);
+        if (erro) { invalido($('#m-' + erro[0]), erro[1]); return true; }
+      } },
+    ]);
+  }
+
+  const optsFundos = () => state.fundos.map(f => [f.id, `${f.nome} — ${f.banco}`]);
+  const valorInvalido = v => !isFinite(v) || v <= 0;
+
+  function editarGasto(id) {
+    const g = state.gastos.find(x => x.id === id);
+    if (!g) return;
+    modalForm('Editar gasto', [
+      { id: 'data', label: 'Data', type: 'date', value: g.data },
+      { id: 'categoria', label: 'Categoria', type: 'select', value: g.categoriaId, options: state.categorias.map(c => [c.id, c.nome]) },
+      { id: 'banco', label: 'Banco / conta de pagamento', type: 'select', value: g.banco || '', options: [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b])] },
+      { id: 'descricao', label: 'Descrição', value: g.descricao },
+      { id: 'valor', label: 'Valor (R$)', type: 'valor', value: g.valor },
+    ], v => {
+      if (!v.data) return ['data', 'Informe a data.'];
+      if (!catById(v.categoria)) return ['categoria', 'Escolha uma categoria.'];
+      if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
+      const antes = { ...g };
+      Object.assign(g, { data: v.data, categoriaId: v.categoria, banco: v.banco, descricao: v.descricao || catById(v.categoria).nome, valor: round2(v.valor) });
+      state.config.ano = +v.data.slice(0, 4); state.config.mesGastos = +v.data.slice(5, 7);
+      commit(id);
+      toast('Gasto atualizado', 'success', () => { Object.assign(g, antes); commit(id); });
+    });
+  }
+
+  function editarMov(id) {
+    const h = state.historico.find(x => x.id === id);
+    if (!h) return;
+    modalForm('Editar movimentação', [
+      { id: 'fundo', label: 'Fundo', type: 'select', value: h.fundoId, options: optsFundos() },
+      { id: 'data', label: 'Data', type: 'date', value: h.data },
+      { id: 'tipo', label: 'Tipo', type: 'select', value: h.valor < 0 ? 'resgate' : 'aporte', options: [['aporte', 'Aporte (+)'], ['resgate', 'Resgate (−)']] },
+      { id: 'valor', label: 'Valor (R$)', type: 'valor', value: Math.abs(h.valor) },
+    ], v => {
+      if (!fundoById(v.fundo)) return ['fundo', 'Escolha um fundo.'];
+      if (!v.data) return ['data', 'Informe a data.'];
+      if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
+      const antes = { ...h };
+      Object.assign(h, { fundoId: v.fundo, data: v.data, valor: round2(v.valor * (v.tipo === 'resgate' ? -1 : 1)) });
+      commit(id);
+      toast('Movimentação atualizada', 'success', () => { Object.assign(h, antes); commit(id); });
+    });
+  }
+
+  function editarSaldo(id) {
+    const s = state.saldos.find(x => x.id === id);
+    if (!s) return;
+    modalForm('Editar saldo mensal', [
+      { id: 'mes', label: 'Mês de referência', type: 'month', value: s.mes },
+      { id: 'fundo', label: 'Fundo', type: 'select', value: s.fundoId, options: optsFundos() },
+      { id: 'valor', label: 'Saldo total (R$)', type: 'valor', value: s.valor },
+    ], v => {
+      if (!/^\d{4}-\d{2}$/.test(v.mes)) return ['mes', 'Informe o mês.'];
+      if (!fundoById(v.fundo)) return ['fundo', 'Escolha um fundo.'];
+      if (!isFinite(v.valor) || v.valor < 0) return ['valor', 'Informe um saldo válido (zero ou positivo).'];
+      if (state.saldos.some(x => x.id !== id && x.fundoId === v.fundo && x.mes === v.mes)) return ['mes', 'Já existe um saldo desse fundo nesse mês.'];
+      const antes = { ...s };
+      Object.assign(s, { mes: v.mes, fundoId: v.fundo, valor: round2(v.valor) });
+      commit(id);
+      toast('Saldo atualizado', 'success', () => { Object.assign(s, antes); commit(id); });
+    });
+  }
+
+  function editarDividendo(id) {
+    const d = state.dividendos.find(x => x.id === id);
+    if (!d) return;
+    modalForm('Editar dividendo', [
+      { id: 'ativo', label: 'Ativo (ticker)', value: d.ativo, list: 'lista-ativos' },
+      { id: 'tipo', label: 'Tipo', type: 'select', value: d.tipo, options: ['FII', 'Ação', 'BDR', 'ETF'].map(t => [t, t]) },
+      { id: 'data', label: 'Data de pagamento', type: 'date', value: d.data },
+      { id: 'valor', label: 'Valor (R$)', type: 'valor', value: d.valor },
+    ], v => {
+      if (!v.ativo) return ['ativo', 'Informe o ativo.'];
+      if (!v.data) return ['data', 'Informe a data.'];
+      if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
+      const antes = { ...d };
+      Object.assign(d, { ativo: v.ativo.toUpperCase(), tipo: v.tipo, data: v.data, valor: round2(v.valor) });
+      state.config.ano = +v.data.slice(0, 4);
+      commit(id);
+      toast('Dividendo atualizado', 'success', () => { Object.assign(d, antes); commit(id); });
+    });
+  }
+
+  function modalRenomearBanco(nomeAtual) {
+    const nF = state.fundos.filter(f => f.banco === nomeAtual).length, nG = state.gastos.filter(g => g.banco === nomeAtual).length;
+    abrirModal('Renomear banco', `
+      <form class="grid gap-3 text-slate-800 dark:text-slate-100">
+        <label class="text-sm">Novo nome <input id="m-nome" required list="lista-bancos" value="${esc(nomeAtual)}" class="inp"></label>
+        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s) e ${nG} gasto(s) vinculados.</p>
+      </form>`, [
+      { label: 'Cancelar', cls: btnSec, cancelar: true },
+      { label: 'Salvar', cls: 'btn-primary', onClick: () => {
+        const novo = $('#m-nome').value.trim().replace(/\s+/g, ' ');
+        if (!novo) { invalido($('#m-nome'), 'Informe o nome do banco.'); return true; }
+        if (novo === nomeAtual) return;
+        if (state.bancos.some(b => b !== nomeAtual && b.toLowerCase() === novo.toLowerCase())) {
+          invalido($('#m-nome'), 'Já existe um banco com esse nome.'); return true;
+        }
+        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos }));
+        state.bancos = state.bancos.map(b => b === nomeAtual ? novo : b);
+        state.fundos.forEach(f => { if (f.banco === nomeAtual) f.banco = novo; });
+        state.gastos.forEach(g => { if (g.banco === nomeAtual) g.banco = novo; });
+        commit(novo);
+        toast(`“${nomeAtual}” renomeado para “${novo}”`, 'success', () => { Object.assign(state, antes); commit(nomeAtual); });
+      } },
+    ]);
+  }
+
+  function importarJSON(texto) {
+    const d = JSON.parse(texto);
+    if (d.modo === 'adicionar') return adicionarLancamentos(d);
+    if (!Array.isArray(d.fundos) || !Array.isArray(d.historico) || !Array.isArray(d.saldos)) throw new Error('formato');
+    const antes = JSON.parse(JSON.stringify(state));
+    state = normalizar(d);
+    state.config.exemplo = false;
+    commit();
+    toast('Backup importado', 'success', () => { state = antes; commit(); });
+  }
+
+  // Arquivo de lançamentos: acrescenta gastos sem substituir os dados atuais
+  function adicionarLancamentos(d) {
+    if (!Array.isArray(d.gastos)) throw new Error('formato');
+    const antes = JSON.parse(JSON.stringify(state));
+    if (state.config.exemplo) {
+      const cfg = state.config;
+      state = defaults();
+      state.config = { ...state.config, aliquotaIR: cfg.aliquotaIR, mostrarNegativo: cfg.mostrarNegativo };
+    }
+    // Categorias: reaproveita as que já existem (mesmo id ou mesmo nome)
+    const mapa = {};
+    for (const c of d.categorias || []) {
+      const igual = catById(c.id) || state.categorias.find(x => x.nome.toLowerCase() === c.nome.toLowerCase());
+      if (igual) mapa[c.id] = igual.id;
+      else state.categorias.push({ id: c.id, nome: c.nome, limite: +c.limite || 0 });
+    }
+    for (const b of d.bancos || []) if (!state.bancos.some(x => x.toLowerCase() === b.toLowerCase())) state.bancos.push(b);
+    const chave = g => `${g.data}|${round2(g.valor)}|${(g.descricao || '').toLowerCase()}`;
+    const existentes = new Set(state.gastos.map(chave));
+    let novos = 0, repetidos = 0;
+    for (const g of d.gastos) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(g.data) || !(+g.valor > 0)) continue;
+      if (existentes.has(chave(g))) { repetidos++; continue; }
+      state.gastos.push({ id: uid(), data: g.data, categoriaId: mapa[g.categoriaId] || g.categoriaId, banco: g.banco || '', descricao: g.descricao || '', valor: round2(+g.valor) });
+      existentes.add(chave(g));
+      novos++;
+    }
+    sincronizarBancos(state);
+    const ultima = d.gastos.map(g => g.data).sort().pop();
+    if (ultima) { state.config.ano = +ultima.slice(0, 4); state.config.mesGastos = +ultima.slice(5, 7); }
+    state.config.secao = 'gastos';
+    commit();
+    toast(`${novos} gastos adicionados${repetidos ? `, ${repetidos} repetidos ignorados` : ''}`, 'success', () => { state = antes; commit(); });
+  }
+
+  function modalExportar() {
+    const json = JSON.stringify(state, null, 2);
+    const emJanela = window.self !== window.top;
+    abrirModal('Exportar backup', `
+      <p class="mb-3">Copie o texto abaixo e guarde em um arquivo ou nota. Para restaurar, use <strong>Importar backup</strong> e cole o texto.</p>
+      <textarea id="txt-backup" readonly class="w-full h-48 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2 font-mono text-xs">${esc(json)}</textarea>`, [
+      ...(emJanela ? [] : [{ label: 'Baixar arquivo', cls: btnSec, onClick: () => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        a.download = `controle-investimentos-${hoje()}.json`; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        toast('Arquivo de backup baixado');
+      } }]),
+      { label: 'Fechar', cls: btnSec },
+      { label: 'Copiar', cls: 'btn-primary', onClick: async () => {
+        const ta = $('#txt-backup');
+        try { await navigator.clipboard.writeText(json); toast('Backup copiado'); }
+        catch (e) { ta.focus(); ta.select(); toast('Texto selecionado. Use Ctrl+C para copiar.', 'info'); }
+        return true;
+      } },
+    ]);
+  }
+
+  function modalImportar() {
+    abrirModal('Importar backup', `
+      <p class="mb-3">Cole o texto ou escolha o arquivo .json. Um backup completo substitui os dados atuais; um arquivo de lançamentos só adiciona os gastos.</p>
+      <textarea id="txt-import" placeholder='{"fundos": [...], ...}' class="w-full h-40 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 p-2 font-mono text-xs"></textarea>`, [
+      { label: 'Escolher arquivo', cls: btnSec, onClick: () => { $('#file-import').click(); } },
+      { label: 'Cancelar', cls: btnSec, cancelar: true },
+      { label: 'Importar', cls: 'btn-primary', onClick: () => {
+        try { importarJSON($('#txt-import').value); }
+        catch (e) { toast('Texto inválido. Cole um backup exportado por este painel.', 'error'); return true; }
+      } },
+    ]);
+  }
+
+  // ---------- Cálculos ----------
+  const catById = id => state.categorias.find(c => c.id === id);
+  const mesGastosKey = () => `${state.config.ano}-${pad(state.config.mesGastos)}`;
+  const totalLimites = () => state.categorias.reduce((s, c) => s + (+c.limite || 0), 0);
+  const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
+  function gastoPorCat(ym) {
+    const m = new Map();
+    for (const g of state.gastos) if (mesDe(g.data) === ym) m.set(g.categoriaId, (m.get(g.categoriaId) || 0) + g.valor);
+    return m;
+  }
+
+  const fundoById = id => state.fundos.find(f => f.id === id);
+  const movsDo = fid => state.historico.filter(h => h.fundoId === fid);
+  const investido = fid => movsDo(fid).reduce((s, h) => s + h.valor, 0);
+  const saldosDo = fid => state.saldos.filter(s => s.fundoId === fid).sort((a, b) => a.mes.localeCompare(b.mes));
+
+  function ultimoSaldo(fid) { const s = saldosDo(fid); return s[s.length - 1] || null; }
+
+  // Valor atual: último saldo informado + movimentações posteriores a ele
+  function rendido(fid) {
+    const u = ultimoSaldo(fid);
+    if (!u) return investido(fid);
+    return u.valor + movsDo(fid).filter(h => mesDe(h.data) > u.mes).reduce((s, h) => s + h.valor, 0);
+  }
+
+  // Lucro do mês = Saldo do mês − Aportes do mês − Saldo do mês anterior
+  function lucroMes(fid, mes) {
+    const saldos = saldosDo(fid);
+    const atual = saldos.find(s => s.mes === mes);
+    if (!atual) return null;
+    let anterior = null;
+    for (const s of saldos) { if (s.mes < mes) anterior = s; else break; }
+    const movs = movsDo(fid);
+    let aportes;
+    if (anterior) {
+      aportes = movs.filter(h => { const m = mesDe(h.data); return m > anterior.mes && m <= mes; }).reduce((s, h) => s + h.valor, 0);
+    } else {
+      // Primeiro mês de vida: subtrai apenas o que foi investido
+      aportes = movs.filter(h => mesDe(h.data) <= mes).reduce((s, h) => s + h.valor, 0);
+    }
+    const lucro = round2(atual.valor - aportes - (anterior ? anterior.valor : 0));
+    return { lucro, saldo: atual.valor, aportes, anterior: anterior ? anterior.valor : null, mesAnterior: anterior?.mes };
+  }
+
+  function ajusta(v) { return !state.config.mostrarNegativo && v < 0 ? 0 : v; }
+
+  function matrizLucro(ano) {
+    const linhas = state.fundos.map(f => {
+      const meses = MESES.map((_, i) => lucroMes(f.id, `${ano}-${pad(i + 1)}`));
+      const total = meses.reduce((s, r) => s + (r ? ajusta(r.lucro) : 0), 0);
+      return { fundo: f, meses, total };
+    });
+    const totMes = MESES.map((_, i) => linhas.reduce((s, l) => s + (l.meses[i] ? ajusta(l.meses[i].lucro) : 0), 0));
+    return { linhas, totMes, total: totMes.reduce((a, b) => a + b, 0) };
+  }
+
+  function divDoAno(ano) { return state.dividendos.filter(d => d.data.startsWith(String(ano))); }
+
+  function matrizDiv(ano) {
+    const lista = divDoAno(ano), mapa = new Map();
+    for (const d of lista) {
+      const k = d.ativo;
+      if (!mapa.has(k)) mapa.set(k, { ativo: k, tipo: d.tipo, meses: Array(12).fill(0), total: 0 });
+      const l = mapa.get(k), m = +d.data.slice(5, 7) - 1;
+      l.meses[m] += d.valor; l.total += d.valor;
+    }
+    const linhas = [...mapa.values()].sort((a, b) => b.total - a.total);
+    const totMes = MESES.map((_, i) => linhas.reduce((s, l) => s + l.meses[i], 0));
+    return { linhas, totMes, total: totMes.reduce((a, b) => a + b, 0) };
+  }
+
+  function resumo() {
+    const aliq = (Number(state.config.aliquotaIR) || 0) / 100;
+    let inv = 0, pat = 0, ir = 0;
+    for (const f of state.fundos) {
+      const i = investido(f.id), r = rendido(f.id);
+      inv += i; pat += r;
+      if (!f.isento && r - i > 0) ir += (r - i) * aliq;
+    }
+    const div = state.dividendos.reduce((s, d) => s + d.valor, 0);
+    const lucroRF = pat - inv;
+    const bruto = lucroRF + div;
+    const liquido = bruto - ir;
+    return { inv, pat, ir, div, lucroRF, bruto, liquido, rent: inv > 0 ? bruto / inv : 0, rentLiq: inv > 0 ? liquido / inv : 0 };
+  }
+
+  function anosDisponiveis() {
+    const anos = new Set([new Date().getFullYear(), state.config.ano]);
+    state.historico.forEach(h => anos.add(+h.data.slice(0, 4)));
+    state.saldos.forEach(s => anos.add(+s.mes.slice(0, 4)));
+    state.dividendos.forEach(d => anos.add(+d.data.slice(0, 4)));
+    state.gastos.forEach(g => anos.add(+g.data.slice(0, 4)));
+    return [...anos].filter(Boolean).sort((a, b) => b - a);
+  }
+
+  // ---------- Renderização ----------
+  function render() {
+    renderNav();
+    renderAno();
+    renderSelects();
+    renderDashboard();
+    renderRF();
+    renderHist();
+    renderSaldos();
+    renderMatriz();
+    renderDiv();
+    renderGastos();
+    renderBancos();
+    $$('.ano-label').forEach(e => e.textContent = state.config.ano);
+    $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
+    $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
+    lucide.createIcons();
+    novoId = null;
+  }
+
+  function renderNav() {
+    const atual = state.config.secao;
+    $('#nav-desktop').innerHTML = SECOES.map(s => `
+      <button data-secao="${s.id}" class="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${s.id === atual
+        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}">
+        <i data-lucide="${s.icon}" class="w-4 h-4"></i>${s.nome}</button>`).join('');
+    $('#nav-mobile').innerHTML = SECOES.map(s => `
+      <button data-secao="${s.id}" class="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border ${s.id === atual
+        ? 'bg-emerald-600 border-emerald-600 text-white'
+        : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'}">
+        <i data-lucide="${s.icon}" class="w-3.5 h-3.5"></i>${s.nome}</button>`).join('');
+    const sec = SECOES.find(s => s.id === atual) || SECOES[0];
+    $('#titulo-secao').textContent = sec.nome;
+    $('#sub-secao').textContent = sec.sub;
+    $$('.secao').forEach(el => el.classList.toggle('hidden', el.id !== 'sec-' + sec.id));
+  }
+
+  function renderAno() {
+    $('#sel-ano').innerHTML = anosDisponiveis().map(a => `<option ${a === state.config.ano ? 'selected' : ''}>${a}</option>`).join('');
+  }
+
+  function renderSelects() {
+    const opts = state.fundos.map(f => `<option value="${f.id}">${esc(f.nome)} — ${esc(f.banco)}</option>`).join('');
+    $$('.sel-fundo').forEach(sel => {
+      const v = sel.value;
+      sel.innerHTML = state.fundos.length ? opts : '<option value="">Nenhum fundo cadastrado</option>';
+      if (fundoById(v)) sel.value = v;
+    });
+    updateHintBanco();
+    $$('.need-fundo').forEach(el => el.innerHTML = state.fundos.length ? '' : `
+      <div class="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <i data-lucide="triangle-alert" class="w-4 h-4"></i> Cadastre um fundo primeiro em
+        <button data-secao="rendafixa" class="font-semibold underline">Renda Fixa</button>.</div>`);
+    const filtroOpts = `<option value="">Todos os fundos</option>` + state.fundos.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+    ['#filtro-hist', '#filtro-saldo'].forEach(s => { const el = $(s), v = el.value; el.innerHTML = filtroOpts; if (fundoById(v)) el.value = v; });
+    const catOpts = state.categorias.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+    $$('.sel-categoria').forEach(sel => {
+      const v = sel.value;
+      sel.innerHTML = catOpts || '<option value="">Crie uma categoria primeiro</option>';
+      if (catById(v)) sel.value = v;
+    });
+    const bancos = bancosOrdenados();
+    $$('.sel-banco').forEach(sel => {
+      const v = sel.value, opcional = 'opcional' in sel.dataset;
+      sel.innerHTML = (opcional ? '<option value="">Não informado</option>' : bancos.length ? '' : '<option value="">Cadastre um banco em Bancos</option>') +
+        bancos.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+      if (bancos.includes(v) || (opcional && v === '')) sel.value = v;
+    });
+    const cadastrados = new Set(state.bancos.map(b => b.toLowerCase()));
+    $('#lista-bancos').innerHTML = BANCOS_SUGERIDOS.filter(b => !cadastrados.has(b.toLowerCase())).map(b => `<option value="${esc(b)}">`).join('');
+    $('#lista-ativos').innerHTML = [...new Set(state.dividendos.map(d => d.ativo))].map(b => `<option value="${esc(b)}">`).join('');
+  }
+
+  function updateHintBanco() {
+    const f = fundoById($('#form-hist [name=fundo]').value);
+    $('#form-hist .hint-banco').textContent = f ? `Banco/Corretora: ${f.banco}` : '';
+  }
+
+  function card(titulo, valor, icon, sub, cls = '', extra = '') {
+    return `<div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col gap-3 ${extra}">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-slate-500 dark:text-slate-400">${titulo}</span>
+        <span class="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-500 dark:text-slate-300"><i data-lucide="${icon}" class="w-4 h-4"></i></span>
+      </div>
+      <div class="text-2xl font-semibold num tracking-tight ${cls}">${valor}</div>
+      <div class="text-xs text-slate-500 dark:text-slate-400">${sub}</div>
+    </div>`;
+  }
+
+  function renderDashboard() {
+    const r = resumo();
+    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length;
+    $('#empty-banner').innerHTML = state.config.exemplo && !vazio ? `
+      <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+        <div class="flex gap-3"><i data-lucide="flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"></i>
+          <div class="text-sm"><span class="font-semibold">Estes são dados de exemplo.</span> Explore à vontade; quando quiser, comece do zero com os seus números.</div></div>
+        <button data-action="zerar" class="btn-primary shrink-0">Começar do zero</button></div>` : vazio ? `
+      <div class="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+        <div class="flex gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5"></i>
+          <div><div class="font-semibold">Comece cadastrando seus fundos</div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">Adicione fundos em Renda Fixa, lance aportes no Histórico e registre os saldos mensais. Ou carregue um exemplo para explorar.</div></div></div>
+        <div class="flex gap-2 shrink-0">
+          <button data-secao="rendafixa" class="rounded-lg border border-emerald-600 text-emerald-700 dark:text-emerald-300 px-3 py-2 text-sm font-medium">Cadastrar fundo</button>
+          <button data-action="exemplo" class="btn-primary">Ver exemplo</button>
+        </div></div>` : '';
+
+    const div = divDoAno(state.config.ano).reduce((s, d) => s + d.valor, 0);
+    const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites();
+    const nomeMes = `${MESES_FULL[state.config.mesGastos - 1]} ${state.config.ano}`;
+    $('#cards').innerHTML = [
+      card('Patrimônio Total', brl(r.pat), 'wallet', 'Valor atual das aplicações', '', 'sm:col-span-2'),
+      card('Total Investido', brl(r.inv), 'piggy-bank', 'Aportes − resgates'),
+      card('Lucro Bruto', brl(r.bruto), 'trending-up', `RF ${brl(r.lucroRF)} + dividendos`, tone(r.bruto)),
+      card('Lucro Líquido', brl(r.liquido), 'badge-dollar-sign', `IR estimado: ${brl(r.ir)} (${num(+state.config.aliquotaIR)}%)`, tone(r.liquido)),
+      card('Dividendos Recebidos', brl(r.div), 'coins', `Em ${state.config.ano}: ${brl(div)}`),
+      card('Gastos Totais do Mês', brl(gMes), 'receipt', `${nomeMes} · ${lim ? pct(gMes / lim) + ' do orçamento' : 'sem orçamento definido'}`,
+        lim && gMes > lim ? 'text-rose-600 dark:text-rose-400' : ''),
+      card('Rentabilidade Geral', `${sign(r.rent)}${pct(r.rent)}`, 'percent', `Líquida: ${sign(r.rentLiq)}${pct(r.rentLiq)}`, tone(r.rent)),
+    ].join('');
+
+    renderChart();
+    renderDistribuicao(r.pat);
+
+    // Painel compacto de orçamento
+    $('#dash-mes-label').textContent = nomeMes;
+    const porCat = gastoPorCat(ym);
+    const cats = state.categorias.filter(c => (+c.limite || 0) > 0 || porCat.get(c.id));
+    $('#dash-orcamento').innerHTML = cats.length ? cats.map(c => {
+      const g = porCat.get(c.id) || 0, l = +c.limite || 0, st = statusOrc(g, l);
+      return `<div class="min-w-0">
+        <div class="flex items-center justify-between gap-3 text-sm mb-1.5"><span class="font-medium truncate">${esc(c.nome)}</span>
+          <span class="num shrink-0"><span class="font-semibold">${brl(g)}</span> <span class="text-slate-400">/ ${l ? brl(l) : '—'}</span></span></div>
+        ${barraOrc(g, l, st)}
+        <div class="flex items-center justify-between gap-2 mt-1 text-xs"><span class="${st.txt} flex items-center gap-1"><i data-lucide="${st.icon}" class="w-3.5 h-3.5"></i>${st.label}</span>
+          <span class="text-slate-500 dark:text-slate-400 num">${l ? (l - g >= 0 ? 'Restam ' + brl(l - g) : 'Excedeu ' + brl(g - l)) : ''}</span></div></div>`;
+    }).join('') : `<div class="text-sm text-slate-400">Nenhuma categoria com limite definido.</div>`;
+  }
+
+  // ---------- Bancos ----------
+  const bancosOrdenados = () => [...state.bancos].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  function renderBancos() {
+    const ano = state.config.ano, ym = mesGastosKey();
+    $('#bancos-mes-label').textContent = `${MESES_FULL[state.config.mesGastos - 1]} ${ano}`;
+    const linha = b => {
+      const fs = state.fundos.filter(f => f.banco === b);
+      const inv = fs.reduce((s, f) => s + investido(f.id), 0), atual = fs.reduce((s, f) => s + rendido(f.id), 0);
+      const gs = state.gastos.filter(g => (g.banco || '') === b);
+      const gMes = gs.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
+      const gAno = gs.filter(g => g.data.startsWith(String(ano))).reduce((s, g) => s + g.valor, 0);
+      return { b, nFundos: fs.length, nGastos: gs.length, inv, atual, lucro: atual - inv, gMes, gAno };
+    };
+    const linhas = bancosOrdenados().map(linha);
+    if (state.gastos.some(g => !g.banco)) linhas.push(linha(''));
+    linhas.sort((x, y) => (y.atual + y.gAno) - (x.atual + x.gAno));
+    const t = linhas.reduce((s, l) => ({ inv: s.inv + l.inv, atual: s.atual + l.atual, lucro: s.lucro + l.lucro, gMes: s.gMes + l.gMes, gAno: s.gAno + l.gAno }),
+      { inv: 0, atual: 0, lucro: 0, gMes: 0, gAno: 0 });
+    const v = (x, cls = '') => Math.abs(x) < EPS ? `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>` : `<td class="td text-right num ${cls}">${brl(x)}</td>`;
+    $('#tbl-bancos').innerHTML = `<thead><tr><th class="th">Banco / Corretora</th><th class="th text-right">Fundos</th><th class="th text-right">Investido</th><th class="th text-right">Valor atual</th>
+      <th class="th text-right">Lucro</th><th class="th text-right">Gastos no mês</th><th class="th text-right">Gastos em ${ano}</th><th class="th"></th></tr></thead>
+      <tbody>${linhas.map(l => {
+        const usado = l.nFundos || l.nGastos;
+        return `<tr class="${l.b && l.b === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="td font-medium ${usado ? '' : 'text-slate-400'}">${esc(l.b || 'Não informado')}${usado ? '' : ' <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5">sem uso</span>'}</td>
+          ${l.nFundos ? `<td class="td text-right num">${l.nFundos}</td>` : '<td class="td text-right text-slate-300 dark:text-slate-600">—</td>'}
+          ${v(l.inv)}${v(l.atual)}${v(l.lucro, 'font-medium ' + tone(l.lucro))}${v(l.gMes)}${v(l.gAno)}
+          <td class="td text-right whitespace-nowrap">${l.b ? `<button class="btn-edit" data-action="edit-banco" data-id="${esc(l.b)}" title="Renomear banco"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-banco" data-id="${esc(l.b)}" title="Excluir banco"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}</td></tr>`;
+      }).join('') || emptyRow(8, 'Nenhum banco cadastrado.')}</tbody>
+      <tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="2">Total</td>
+        <td class="td text-right num">${brl(t.inv)}</td><td class="td text-right num">${brl(t.atual)}</td><td class="td text-right num ${tone(t.lucro)}">${brl(t.lucro)}</td>
+        <td class="td text-right num">${brl(t.gMes)}</td><td class="td text-right num">${brl(t.gAno)}</td><td class="td"></td></tr></tfoot>`;
+  }
+
+  // ---------- Gastos e orçamento ----------
+  function statusOrc(g, l) {
+    if (!l) return { label: 'Sem limite', icon: 'minus', bar: 'bg-slate-400', txt: 'text-slate-500 dark:text-slate-400' };
+    const p = g / l;
+    if (p > 1) return { label: 'Acima do limite', icon: 'circle-alert', bar: 'bg-rose-500', txt: 'text-rose-600 dark:text-rose-400' };
+    if (p >= 0.8) return { label: 'Atenção', icon: 'triangle-alert', bar: 'bg-amber-500', txt: 'text-amber-600 dark:text-amber-400' };
+    return { label: 'Dentro do limite', icon: 'circle-check', bar: 'bg-emerald-500', txt: 'text-emerald-600 dark:text-emerald-400' };
+  }
+
+  const barraOrc = (g, l, st) => `<div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+    <div class="h-full rounded-full ${st.bar}" style="width:${l ? Math.min(100, g / l * 100).toFixed(1) : (g > 0 ? 100 : 0)}%"></div></div>`;
+
+  function renderGastos() {
+    const ano = state.config.ano, mes = state.config.mesGastos, ym = mesGastosKey();
+    $('#sel-mes-gastos').innerHTML = MESES_FULL.map((n, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${n} ${ano}</option>`).join('');
+    $('#gastos-mes-label').textContent = `${MESES_FULL[mes - 1]} ${ano}`;
+
+    const porCat = gastoPorCat(ym), total = totalGastos(ym), lim = totalLimites(), resto = lim - total;
+    const kpi = (rot, val, cls = 'text-slate-800 dark:text-slate-100') =>
+      `<span class="text-slate-500 dark:text-slate-400">${rot} <strong class="num ml-1 ${cls}">${val}</strong></span>`;
+    $('#gastos-kpis').innerHTML = kpi('Gasto no mês', brl(total)) + kpi('Orçamento', brl(lim)) +
+      (lim ? kpi(resto >= 0 ? 'Disponível' : 'Acima do orçamento', brl(Math.abs(resto)), resto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400') : '');
+
+    // Orçamento por categoria
+    const rows = state.categorias.map(c => {
+      const g = porCat.get(c.id) || 0, l = +c.limite || 0, st = statusOrc(g, l);
+      return `<tr class="${c.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td font-medium">${esc(c.nome)}</td>
+        <td class="td text-right num">${brl(g)}</td>
+        <td class="td"><input data-limite="${c.id}" value="${num(l)}" inputmode="decimal" aria-label="Limite mensal de ${esc(c.nome)}"
+          class="w-28 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-right text-sm num focus:outline-none focus:ring-2 focus:ring-emerald-500"></td>
+        <td class="td min-w-[170px]"><div class="flex items-center gap-2"><div class="flex-1">${barraOrc(g, l, st)}</div>
+          <span class="num text-xs w-11 text-right text-slate-500 dark:text-slate-400">${l ? Math.round(g / l * 100) + '%' : '—'}</span></div></td>
+        <td class="td"><span class="inline-flex items-center gap-1 text-xs font-medium ${st.txt}"><i data-lucide="${st.icon}" class="w-3.5 h-3.5"></i>${st.label}</span></td>
+        <td class="td text-right"><button class="btn-del" data-action="del-cat" data-id="${c.id}" title="Excluir categoria"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
+    }).join('');
+    $('#tbl-orcamento').innerHTML = `<thead><tr><th class="th">Categoria</th><th class="th text-right">Gasto</th><th class="th">Limite mensal</th><th class="th">Uso</th><th class="th">Situação</th><th class="th"></th></tr></thead>
+      <tbody>${rows || emptyRow(6, 'Nenhuma categoria. Crie uma abaixo.')}</tbody>
+      ${state.categorias.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td">Total</td><td class="td text-right num">${brl(total)}</td>
+        <td class="td num">${brl(lim)}</td><td class="td num text-xs text-slate-500 dark:text-slate-400">${lim ? Math.round(total / lim * 100) + '% do orçamento' : ''}</td><td class="td" colspan="2"></td></tr></tfoot>` : ''}`;
+
+    // Lançamentos do mês
+    const lista = state.gastos.filter(g => mesDe(g.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
+    $('#gastos-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
+    $('#tbl-gastos').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Categoria</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(g => `<tr class="${g.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td num">${fmtData(g.data)}</td>
+        <td class="td"><span class="text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5">${esc(catById(g.categoriaId)?.nome ?? 'Sem categoria')}</span></td>
+        <td class="td ${g.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(g.banco || 'Não informado')}</td>
+        <td class="td text-slate-600 dark:text-slate-300">${esc(g.descricao)}</td>
+        <td class="td text-right num font-medium">${brl(g.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-gasto" data-id="${g.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-gasto" data-id="${g.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum gasto lançado neste mês.')}</tbody>
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês</td><td class="td text-right num">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+
+    // Gastos do mês por banco
+    const porBanco = new Map();
+    for (const g of lista) porBanco.set(g.banco || '', (porBanco.get(g.banco || '') || 0) + g.valor);
+    const bl = [...porBanco].sort((a, b) => b[1] - a[1]);
+    $('#gastos-por-banco').innerHTML = bl.length ? bl.map(([b, v]) => {
+      const p = total > 0 ? v / total : 0;
+      return `<div>
+        <div class="flex justify-between gap-3 text-sm mb-1"><span class="truncate ${b ? '' : 'text-slate-400'}">${esc(b || 'Não informado')}</span>
+          <span class="num shrink-0"><span class="font-medium">${brl(v)}</span> <span class="text-xs text-slate-400">${pct(p)}</span></span></div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"><div class="h-full rounded-full bg-sky-600 dark:bg-sky-500" style="width:${(p * 100).toFixed(1)}%"></div></div></div>`;
+    }).join('') : `<div class="text-sm text-slate-400">Nenhum gasto neste mês.</div>`;
+
+    // Matriz categoria × mês
+    const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
+    const porMes = MESES.map((_, i) => gastoPorCat(`${ano}-${pad(i + 1)}`));
+    const totMes = porMes.map(m => [...m.values()].reduce((a, b) => a + b, 0));
+    const corpo = state.categorias.map(c => {
+      const l = +c.limite || 0;
+      let tot = 0;
+      const cells = porMes.map(m => {
+        const v = m.get(c.id) || 0; tot += v;
+        if (v < EPS) return `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`;
+        const acima = l && v > l;
+        return `<td class="td text-right num ${acima ? 'text-rose-600 dark:text-rose-400 font-medium' : ''}" ${acima ? `title="Acima do limite de ${brl(l)}"` : ''}>${num(v)}</td>`;
+      }).join('');
+      return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40"><td class="td ${stickyL} font-medium"><div>${esc(c.nome)}</div><div class="text-[11px] text-slate-400 font-normal">limite ${l ? brl(l) : '—'}</div></td>
+        ${cells}<td class="td text-right num font-semibold bg-slate-50 dark:bg-slate-900/60">${num(tot)}</td></tr>`;
+    }).join('');
+    const totAno = totMes.reduce((a, b) => a + b, 0);
+    $('#tbl-gastos-matriz').innerHTML = `<thead><tr><th class="th ${stickyL} !bg-slate-50 dark:!bg-slate-900 min-w-[150px]">Categoria</th>${MESES.map(n => `<th class="th text-right">${n}</th>`).join('')}<th class="th text-right">Total</th></tr></thead>
+      <tbody>${corpo || emptyRow(14, 'Nenhuma categoria cadastrada.')}</tbody>
+      ${state.categorias.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td ${stickyL} !bg-slate-50 dark:!bg-slate-900">Total Geral</td>
+        ${totMes.map((v, i) => v > EPS ? `<td class="td text-right num ${lim && v > lim ? 'text-rose-600 dark:text-rose-400' : ''}">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
+        <td class="td text-right num">${num(totAno)}</td></tr></tfoot>` : ''}`;
+  }
+
+  function renderChart() {
+    const ano = state.config.ano;
+    const m = matrizLucro(ano), d = matrizDiv(ano);
+    const dados = MESES.map((nome, i) => ({ nome, rf: m.totMes[i], div: d.totMes[i], total: m.totMes[i] + d.totMes[i] }));
+    const total = dados.reduce((s, x) => s + x.total, 0);
+    $('#chart-total').innerHTML = `<div class="text-xs text-slate-500 dark:text-slate-400">Acumulado no ano</div><div class="font-semibold num ${tone(total)}">${brl(total)}</div>`;
+
+    const el = $('#chart');
+    if (dados.every(x => Math.abs(x.total) < EPS)) {
+      el.innerHTML = `<div class="h-56 grid place-items-center text-sm text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">Sem resultados registrados em ${ano}</div>`;
+      return;
+    }
+    const W = 720, H = 240, pl = 64, pr = 8, pt = 12, pb = 28;
+    const max = Math.max(0, ...dados.map(x => x.total)), min = Math.min(0, ...dados.map(x => x.total));
+    const niceStep = (range) => { const raw = range / 4, p = Math.pow(10, Math.floor(Math.log10(raw))); return [1, 2, 2.5, 5, 10].map(k => k * p).find(s => s >= raw); };
+    const step = niceStep((max - min) || 1);
+    const yMax = Math.ceil(max / step) * step, yMin = Math.floor(min / step) * step;
+    const y = v => pt + (yMax - v) / ((yMax - yMin) || 1) * (H - pt - pb);
+    const bw = (W - pl - pr) / 12, barW = Math.min(28, bw * 0.55);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Resultado mensal">`;
+    for (let v = yMin; v <= yMax + step / 2; v += step) {
+      svg += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" class="${Math.abs(v) < EPS ? 'stroke-slate-400 dark:stroke-slate-500' : 'stroke-slate-200 dark:stroke-slate-800'}" stroke-width="1"/>`;
+      svg += `<text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end" class="fill-slate-400 text-[11px]">${v.toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 })}</text>`;
+    }
+    dados.forEach((x, i) => {
+      const cx = pl + bw * i + bw / 2;
+      const y0 = y(0), y1 = y(x.total), h = Math.abs(y1 - y0);
+      const pos = x.total >= 0;
+      if (h > 0.5) {
+        const r = Math.min(4, h, barW / 2), xl = cx - barW / 2, xr = cx + barW / 2;
+        const path = pos
+          ? `M${xl},${y0} V${y1 + r} Q${xl},${y1} ${xl + r},${y1} H${xr - r} Q${xr},${y1} ${xr},${y1 + r} V${y0} Z`
+          : `M${xl},${y0} V${y1 - r} Q${xl},${y1} ${xl + r},${y1} H${xr - r} Q${xr},${y1} ${xr},${y1 - r} V${y0} Z`;
+        svg += `<path d="${path}" class="${pos ? 'fill-emerald-500 dark:fill-emerald-400' : 'fill-rose-500 dark:fill-rose-400'} bar" data-i="${i}"/>`;
+      }
+      svg += `<text x="${cx}" y="${H - 8}" text-anchor="middle" class="fill-slate-500 dark:fill-slate-400 text-[11px]">${x.nome}</text>`;
+      svg += `<rect x="${pl + bw * i}" y="${pt}" width="${bw}" height="${H - pt - pb}" fill="transparent" class="hit" data-i="${i}"/>`;
+    });
+    svg += '</svg>';
+    el.innerHTML = svg;
+
+    const tip = $('#tooltip');
+    $$('.hit', el).forEach(h => {
+      h.addEventListener('mousemove', ev => {
+        const x = dados[+h.dataset.i];
+        $$('.bar', el).forEach(b => b.style.opacity = b.dataset.i === h.dataset.i ? '1' : '.45');
+        tip.innerHTML = `<div class="font-semibold mb-1">${MESES_FULL[+h.dataset.i]} ${ano}</div>
+          <div class="flex justify-between gap-6"><span class="text-slate-500 dark:text-slate-400">Lucro renda fixa</span><span class="num ${tone(x.rf)}">${brl(x.rf)}</span></div>
+          <div class="flex justify-between gap-6"><span class="text-slate-500 dark:text-slate-400">Dividendos</span><span class="num">${brl(x.div)}</span></div>
+          <div class="flex justify-between gap-6 border-t border-slate-200 dark:border-slate-700 mt-1 pt-1 font-semibold"><span>Total</span><span class="num ${tone(x.total)}">${brl(x.total)}</span></div>`;
+        tip.classList.remove('hidden');
+        const tw = tip.offsetWidth;
+        tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - tw - 8) + 'px';
+        tip.style.top = (ev.clientY + 14) + 'px';
+      });
+      h.addEventListener('mouseleave', () => { tip.classList.add('hidden'); $$('.bar', el).forEach(b => b.style.opacity = '1'); });
+    });
+  }
+
+  function renderDistribuicao(pat) {
+    const porBanco = state.config.distPor === 'banco';
+    $('#dist-toggle').innerHTML = [['fundo', 'Fundo'], ['banco', 'Banco']].map(([k, n]) =>
+      `<button data-action="dist" data-por="${k}" class="px-2.5 py-1 rounded-md ${(porBanco ? 'banco' : 'fundo') === k
+        ? 'bg-emerald-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}">${n}</button>`).join('');
+    $('#dist-sub').textContent = porBanco ? 'Valor atual por banco/corretora' : 'Valor atual por fundo/conta';
+    let itens;
+    if (porBanco) {
+      const m = new Map();
+      for (const f of state.fundos) m.set(f.banco, (m.get(f.banco) || 0) + rendido(f.id));
+      itens = [...m].map(([b, v]) => ({ nome: b, det: `${state.fundos.filter(f => f.banco === b).length} fundo(s)`, v }));
+    } else {
+      itens = state.fundos.map(f => ({ nome: f.nome, det: f.banco, v: rendido(f.id) }));
+    }
+    itens = itens.filter(x => x.v > EPS).sort((a, b) => b.v - a.v);
+    $('#distribuicao').innerHTML = itens.length ? itens.map(({ nome, det, v }) => {
+      const p = pat > 0 ? v / pat : 0;
+      return `<div>
+        <div class="flex justify-between text-sm mb-1 gap-3"><span class="truncate">${esc(nome)} <span class="text-slate-400 text-xs">· ${esc(det)}</span></span><span class="num text-slate-600 dark:text-slate-300 shrink-0">${pct(p)}</span></div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"><div class="h-full rounded-full bg-emerald-600 dark:bg-emerald-500" style="width:${(p * 100).toFixed(2)}%"></div></div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 num">${brl(v)}</div></div>`;
+    }).join('') : `<div class="text-sm text-slate-400">Nenhum valor aplicado ainda.</div>`;
+  }
+
+  const emptyRow = (cols, msg) => `<tr><td colspan="${cols}" class="td text-center text-slate-400 py-10">${msg}</td></tr>`;
+
+  function renderRF() {
+    let tI = 0, tR = 0;
+    const rows = state.fundos.map(f => {
+      const i = investido(f.id), r = rendido(f.id), l = r - i, u = ultimoSaldo(f.id);
+      tI += i; tR += r;
+      return `<tr class="${f.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td font-medium">${esc(f.nome)} ${f.isento ? '<span class="ml-1 text-[10px] font-semibold uppercase rounded bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 px-1.5 py-0.5">Isento</span>' : ''}</td>
+        <td class="td text-slate-600 dark:text-slate-300">${esc(f.banco)}</td>
+        <td class="td text-right num">${brl(i)}</td>
+        <td class="td text-right num">${brl(r)}</td>
+        <td class="td text-right num font-medium ${tone(l)}">${sign(l)}${brl(l)}</td>
+        <td class="td text-right num ${tone(l)}">${i > 0 ? sign(l) + pct(l / i) : '—'}</td>
+        <td class="td text-slate-500 dark:text-slate-400 text-xs">${u ? fmtMes(u.mes) : 'sem saldo'}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-fundo" data-id="${f.id}" title="Editar fundo"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-fundo" data-id="${f.id}" title="Excluir fundo"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+      </tr>`;
+    }).join('');
+    const tl = tR - tI;
+    $('#tbl-rf').innerHTML = `<thead><tr>
+      <th class="th">Fundo / Conta</th><th class="th">Banco / Corretora</th><th class="th text-right">Valor Investido</th>
+      <th class="th text-right">Valor Rendido</th><th class="th text-right">Lucro</th><th class="th text-right">Rent.</th><th class="th">Último saldo</th><th class="th"></th></tr></thead>
+      <tbody>${rows || emptyRow(8, 'Nenhum fundo cadastrado. Use o formulário acima.')}</tbody>
+      ${state.fundos.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60">
+        <td class="td" colspan="2">Total</td><td class="td text-right num">${brl(tI)}</td><td class="td text-right num">${brl(tR)}</td>
+        <td class="td text-right num ${tone(tl)}">${sign(tl)}${brl(tl)}</td><td class="td text-right num ${tone(tl)}">${tI > 0 ? sign(tl) + pct(tl / tI) : '—'}</td><td class="td" colspan="2"></td></tr></tfoot>` : ''}`;
+    $('#rf-count').textContent = `${state.fundos.length} ${state.fundos.length === 1 ? 'ativo' : 'ativos'}`;
+  }
+
+  function renderHist() {
+    const filtro = $('#filtro-hist').value;
+    const lista = state.historico.filter(h => !filtro || h.fundoId === filtro).sort((a, b) => b.data.localeCompare(a.data));
+    const rows = lista.map(h => {
+      const f = fundoById(h.fundoId);
+      return `<tr class="${h.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td font-medium">${esc(f?.nome ?? '—')}</td>
+        <td class="td num">${fmtData(h.data)}</td>
+        <td class="td text-slate-600 dark:text-slate-300">${esc(f?.banco ?? '—')}</td>
+        <td class="td"><span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 ${h.valor >= 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}">
+          <i data-lucide="${h.valor >= 0 ? 'arrow-down-to-line' : 'arrow-up-from-line'}" class="w-3 h-3"></i>${h.valor >= 0 ? 'Aporte' : 'Resgate'}</span></td>
+        <td class="td text-right num font-medium ${tone(h.valor)}">${brl(h.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-hist" data-id="${h.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-hist" data-id="${h.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+      </tr>`;
+    }).join('');
+    const tot = lista.reduce((s, h) => s + h.valor, 0);
+    $('#tbl-hist').innerHTML = `<thead><tr><th class="th">Fundo</th><th class="th">Data</th><th class="th">Banco / Corretora</th><th class="th">Tipo</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
+      <tbody>${rows || emptyRow(6, 'Nenhuma movimentação lançada.')}</tbody>
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Saldo líquido aportado (${lista.length} lançamentos)</td><td class="td text-right num">${brl(tot)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+  }
+
+  function renderSaldos() {
+    const filtro = $('#filtro-saldo').value;
+    const lista = state.saldos.filter(s => !filtro || s.fundoId === filtro)
+      .sort((a, b) => b.mes.localeCompare(a.mes) || (fundoById(a.fundoId)?.nome || '').localeCompare(fundoById(b.fundoId)?.nome || ''));
+    const rows = lista.map(s => {
+      const f = fundoById(s.fundoId), r = lucroMes(s.fundoId, s.mes);
+      return `<tr class="${s.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td num">${fmtMes(s.mes)}</td>
+        <td class="td font-medium">${esc(f?.nome ?? '—')} <span class="text-xs text-slate-400">· ${esc(f?.banco ?? '')}</span></td>
+        <td class="td text-right num">${brl(s.valor)}</td>
+        <td class="td text-right num ${tone(r?.lucro)}">${r ? sign(r.lucro) + brl(r.lucro) : '—'}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-saldo" data-id="${s.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-saldo" data-id="${s.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+      </tr>`;
+    }).join('');
+    $('#tbl-saldo').innerHTML = `<thead><tr><th class="th">Data (mês)</th><th class="th">Fundo</th><th class="th text-right">Valor do saldo</th><th class="th text-right">Lucro no mês</th><th class="th"></th></tr></thead>
+      <tbody>${rows || emptyRow(5, 'Nenhum saldo registrado.')}</tbody>`;
+  }
+
+  function renderMatriz() {
+    const ano = state.config.ano, m = matrizLucro(ano);
+    const tgl = $('#tgl-neg'), on = !state.config.mostrarNegativo;
+    tgl.setAttribute('aria-checked', on);
+    tgl.className = `relative h-6 w-11 rounded-full transition-colors ${on ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`;
+    tgl.firstElementChild.style.transform = on ? 'translateX(20px)' : 'none';
+
+    const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
+    const head = `<thead><tr><th class="th ${stickyL} !bg-slate-50 dark:!bg-slate-900 min-w-[180px]">Fundo</th>${MESES.map(n => `<th class="th text-right">${n}</th>`).join('')}<th class="th text-right">Total</th></tr></thead>`;
+    const body = m.linhas.map(l => `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <td class="td ${stickyL} font-medium"><div>${esc(l.fundo.nome)}</div><div class="text-[11px] text-slate-400 font-normal">${esc(l.fundo.banco)}</div></td>
+      ${l.meses.map((r, i) => {
+        if (!r) return `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`;
+        const v = ajusta(r.lucro);
+        const det = `${MESES_FULL[i]}: saldo ${brl(r.saldo)} − aportes ${brl(r.aportes)}` + (r.anterior !== null ? ` − saldo anterior ${brl(r.anterior)} (${fmtMes(r.mesAnterior)})` : ' (primeiro mês do fundo)') + ` = ${brl(r.lucro)}`;
+        return `<td class="td text-right num cursor-help ${tone(v)}" title="${esc(det)}">${num(v)}</td>`;
+      }).join('')}
+      <td class="td text-right num font-semibold ${tone(l.total)} bg-slate-50 dark:bg-slate-900/60">${num(l.total)}</td></tr>`).join('');
+    const foot = m.linhas.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60">
+      <td class="td ${stickyL} !bg-slate-50 dark:!bg-slate-900">Total Geral</td>
+      ${m.totMes.map((v, i) => m.linhas.some(l => l.meses[i]) ? `<td class="td text-right num ${tone(v)}">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
+      <td class="td text-right num ${tone(m.total)}">${num(m.total)}</td></tr></tfoot>` : '';
+    $('#tbl-matriz').innerHTML = head + `<tbody>${body || emptyRow(14, 'Cadastre fundos e registre saldos mensais para ver a matriz.')}</tbody>` + foot;
+  }
+
+  function renderDiv() {
+    const ano = state.config.ano, m = matrizDiv(ano);
+    const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
+    const badge = t => `<span class="ml-1.5 text-[10px] font-semibold uppercase rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5">${esc(t)}</span>`;
+    $('#tbl-divmatriz').innerHTML = `<thead><tr><th class="th ${stickyL} !bg-slate-50 dark:!bg-slate-900 min-w-[150px]">Ativo</th>${MESES.map(n => `<th class="th text-right">${n}</th>`).join('')}<th class="th text-right">Total</th></tr></thead>
+      <tbody>${m.linhas.map(l => `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td ${stickyL} font-medium">${esc(l.ativo)}${badge(l.tipo)}</td>
+        ${l.meses.map(v => v > EPS ? `<td class="td text-right num text-emerald-600 dark:text-emerald-400">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
+        <td class="td text-right num font-semibold bg-slate-50 dark:bg-slate-900/60">${num(l.total)}</td></tr>`).join('') || emptyRow(14, `Nenhum dividendo lançado em ${ano}.`)}</tbody>
+      ${m.linhas.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td ${stickyL} !bg-slate-50 dark:!bg-slate-900">Total Geral</td>
+        ${m.totMes.map(v => v > EPS ? `<td class="td text-right num">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}<td class="td text-right num text-emerald-600 dark:text-emerald-400">${num(m.total)}</td></tr></tfoot>` : ''}`;
+
+    const lista = divDoAno(ano).sort((a, b) => b.data.localeCompare(a.data));
+    $('#div-count').textContent = `${lista.length} lançamentos`;
+    $('#tbl-div').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Ativo</th><th class="th">Tipo</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(d => `<tr class="${d.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td num">${fmtData(d.data)}</td><td class="td font-medium">${esc(d.ativo)}</td><td class="td text-slate-600 dark:text-slate-300">${esc(d.tipo)}</td>
+        <td class="td text-right num text-emerald-600 dark:text-emerald-400">${brl(d.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-div" data-id="${d.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-div" data-id="${d.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(5, 'Nenhum lançamento neste ano.')}</tbody>`;
+  }
+
+  // ---------- Formulários ----------
+  function invalido(input, msg) {
+    input.classList.add('!border-rose-500', '!ring-rose-500');
+    input.focus();
+    setTimeout(() => input.classList.remove('!border-rose-500', '!ring-rose-500'), 2000);
+    toast(msg, 'error');
+  }
+
+  $('#form-fundo').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target, nome = fm.nome.value.trim(), banco = fm.banco.value.trim();
+    if (state.fundos.some(f => f.nome.toLowerCase() === nome.toLowerCase() && f.banco.toLowerCase() === banco.toLowerCase()))
+      return invalido(fm.nome, 'Já existe um fundo com esse nome neste banco.');
+    const f = { id: uid(), nome, banco, isento: fm.isento.checked };
+    state.fundos.push(f);
+    fm.reset();
+    commit(f.id);
+    toast(`Fundo “${nome}” cadastrado`);
+  });
+
+  $('#form-hist').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    if (!fundoById(fm.fundo.value)) return toast('Cadastre um fundo antes de lançar movimentações.', 'error');
+    let v = parseValor(fm.valor.value);
+    if (!isFinite(v) || v === 0) return invalido(fm.valor, 'Informe um valor válido.');
+    v = Math.abs(v) * (fm.tipo.value === 'resgate' ? -1 : 1);
+    const h = { id: uid(), fundoId: fm.fundo.value, data: fm.data.value, valor: round2(v) };
+    state.historico.push(h);
+    fm.valor.value = '';
+    commit(h.id);
+    toast(`${v >= 0 ? 'Aporte' : 'Resgate'} de ${brl(Math.abs(v))} lançado`);
+  });
+
+  $('#form-saldo').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    if (!fundoById(fm.fundo.value)) return toast('Cadastre um fundo antes de registrar saldos.', 'error');
+    const v = parseValor(fm.valor.value);
+    if (!isFinite(v) || v < 0) return invalido(fm.valor, 'Informe um saldo válido (zero ou positivo).');
+    const exist = state.saldos.find(s => s.fundoId === fm.fundo.value && s.mes === fm.mes.value);
+    let id;
+    if (exist) { exist.valor = round2(v); id = exist.id; }
+    else { id = uid(); state.saldos.push({ id, fundoId: fm.fundo.value, mes: fm.mes.value, valor: round2(v) }); }
+    fm.valor.value = '';
+    commit(id);
+    toast(exist ? `Saldo de ${fmtMes(fm.mes.value)} atualizado` : `Saldo de ${fmtMes(fm.mes.value)} registrado`);
+  });
+
+  $('#form-div').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    const v = parseValor(fm.valor.value);
+    if (!isFinite(v) || v <= 0) return invalido(fm.valor, 'Informe um valor maior que zero.');
+    const ativo = fm.ativo.value.trim().toUpperCase();
+    const d = { id: uid(), ativo, tipo: fm.tipo.value, data: fm.data.value, valor: round2(v) };
+    state.dividendos.push(d);
+    fm.valor.value = '';
+    const ano = +d.data.slice(0, 4);
+    if (ano !== state.config.ano) state.config.ano = ano;
+    commit(d.id);
+    toast(`Dividendo de ${ativo} (${brl(v)}) lançado`);
+  });
+
+  $('#form-gasto').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target, cat = catById(fm.categoria.value);
+    if (!cat) return toast('Crie uma categoria antes de lançar gastos.', 'error');
+    const v = parseValor(fm.valor.value);
+    if (!isFinite(v) || v <= 0) return invalido(fm.valor, 'Informe um valor maior que zero.');
+    const g = { id: uid(), data: fm.data.value, categoriaId: cat.id, banco: fm.banco.value, descricao: fm.descricao.value.trim() || cat.nome, valor: round2(v) };
+    state.gastos.push(g);
+    state.config.ano = +g.data.slice(0, 4);
+    state.config.mesGastos = +g.data.slice(5, 7);
+    fm.valor.value = ''; fm.descricao.value = '';
+    commit(g.id);
+    const l = +cat.limite || 0, usado = gastoPorCat(mesGastosKey()).get(cat.id) || 0;
+    if (l && usado > l) toast(`Gasto lançado. ${cat.nome} passou do limite em ${brl(usado - l)}.`, 'error');
+    else toast(`Gasto de ${brl(v)} lançado em ${cat.nome}`);
+  });
+
+  $('#form-banco').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target, nome = fm.nome.value.trim().replace(/\s+/g, ' ');
+    if (!nome) return invalido(fm.nome, 'Informe o nome do banco.');
+    if (state.bancos.some(b => b.toLowerCase() === nome.toLowerCase())) return invalido(fm.nome, 'Esse banco já está cadastrado.');
+    state.bancos.push(nome);
+    fm.reset();
+    commit(nome);
+    toast(`Banco “${nome}” adicionado`);
+  });
+
+  $('#form-cat').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target, nome = fm.nome.value.trim();
+    if (state.categorias.some(c => c.nome.toLowerCase() === nome.toLowerCase())) return invalido(fm.nome, 'Já existe uma categoria com esse nome.');
+    const l = fm.limite.value.trim() ? parseValor(fm.limite.value) : 0;
+    if (!isFinite(l) || l < 0) return invalido(fm.limite, 'Informe um limite válido (zero ou positivo).');
+    const c = { id: uid(), nome, limite: round2(l) };
+    state.categorias.push(c);
+    fm.reset();
+    commit(c.id);
+    toast(`Categoria “${nome}” criada`);
+  });
+
+  document.addEventListener('change', e => {
+    const inp = e.target.closest('[data-limite]');
+    if (!inp) return;
+    const c = catById(inp.dataset.limite);
+    const v = inp.value.trim() ? parseValor(inp.value) : 0;
+    if (!c) return;
+    if (!isFinite(v) || v < 0) { inp.value = num(+c.limite || 0); return toast('Informe um limite válido (zero ou positivo).', 'error'); }
+    c.limite = round2(v); save(); render();
+    toast(`Limite de ${c.nome} ajustado para ${brl(c.limite)}`, 'info');
+  });
+
+  // Ao trocar o mês, a data do formulário acompanha
+  function syncDataGasto() {
+    const ym = mesGastosKey();
+    $('#form-gasto [name=data]').value = hoje().startsWith(ym) ? hoje() : `${ym}-01`;
+  }
+  function mudarMes(delta) {
+    let m = state.config.mesGastos + delta, a = state.config.ano;
+    if (m < 1) { m = 12; a--; } else if (m > 12) { m = 1; a++; }
+    state.config.mesGastos = m; state.config.ano = a;
+    save(); syncDataGasto(); render();
+  }
+  $('#sel-mes-gastos').addEventListener('change', e => { state.config.mesGastos = +e.target.value; save(); syncDataGasto(); render(); });
+
+  $('#form-hist [name=fundo]').addEventListener('change', updateHintBanco);
+  $('#form-div [name=ativo]').addEventListener('change', e => {
+    const ult = state.dividendos.find(d => d.ativo === e.target.value.trim().toUpperCase());
+    if (ult) $('#form-div [name=tipo]').value = ult.tipo;
+  });
+
+  // ---------- Exclusões com "Desfazer" ----------
+  function removerComUndo(colecao, id, msg) {
+    const arr = state[colecao], idx = arr.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const [item] = arr.splice(idx, 1);
+    commit();
+    toast(msg, 'success', () => { state[colecao].splice(idx, 0, item); commit(item.id); });
+  }
+
+  document.addEventListener('click', async e => {
+    const sec = e.target.closest('[data-secao]');
+    if (sec) {
+      state.config.secao = sec.dataset.secao; save(); renderNav(); lucide.createIcons();
+      const el = $('#sec-' + sec.dataset.secao); el.classList.remove('section-enter'); void el.offsetWidth; el.classList.add('section-enter');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    switch (btn.dataset.action) {
+      case 'del-hist': removerComUndo('historico', id, 'Movimentação excluída'); break;
+      case 'del-saldo': removerComUndo('saldos', id, 'Saldo excluído'); break;
+      case 'del-div': removerComUndo('dividendos', id, 'Dividendo excluído'); break;
+      case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
+      case 'edit-fundo': modalEditarFundo(id); break;
+      case 'edit-gasto': editarGasto(id); break;
+      case 'edit-hist': editarMov(id); break;
+      case 'edit-saldo': editarSaldo(id); break;
+      case 'edit-div': editarDividendo(id); break;
+      case 'edit-banco': modalRenomearBanco(id); break;
+      case 'dist': state.config.distPor = btn.dataset.por; save(); renderDistribuicao(resumo().pat); break;
+      case 'del-banco': {
+        const nF = state.fundos.filter(f => f.banco === id).length, nG = state.gastos.filter(g => g.banco === id).length;
+        if (nF || nG) return toast(`“${id}” está em uso por ${nF} fundo(s) e ${nG} gasto(s). Remova ou altere esses registros antes.`, 'error');
+        const idx = state.bancos.indexOf(id);
+        state.bancos.splice(idx, 1);
+        commit();
+        toast(`Banco “${id}” excluído`, 'success', () => { state.bancos.splice(idx, 0, id); commit(id); });
+        break;
+      }
+      case 'mes-ant': mudarMes(-1); break;
+      case 'mes-prox': mudarMes(1); break;
+      case 'del-cat': {
+        const c = catById(id), n = state.gastos.filter(g => g.categoriaId === id).length;
+        if (n && !await confirmar('Excluir categoria', `Excluir “${c.nome}”? ${n} ${n === 1 ? 'gasto vinculado também será removido' : 'gastos vinculados também serão removidos'}.`, 'Excluir')) return;
+        const backup = { categorias: [...state.categorias], gastos: [...state.gastos] };
+        state.categorias = state.categorias.filter(x => x.id !== id);
+        state.gastos = state.gastos.filter(x => x.categoriaId !== id);
+        commit();
+        toast(`Categoria “${c.nome}” excluída`, 'success', () => { Object.assign(state, backup); commit(id); });
+        break;
+      }
+      case 'del-fundo': {
+        const f = fundoById(id);
+        const nH = state.historico.filter(h => h.fundoId === id).length, nS = state.saldos.filter(s => s.fundoId === id).length;
+        if ((nH || nS) && !await confirmar('Excluir fundo', `Excluir “${f.nome}”? ${nH} movimentações e ${nS} saldos vinculados também serão removidos.`, 'Excluir')) return;
+        const backup = { fundos: [...state.fundos], historico: [...state.historico], saldos: [...state.saldos] };
+        state.fundos = state.fundos.filter(x => x.id !== id);
+        state.historico = state.historico.filter(x => x.fundoId !== id);
+        state.saldos = state.saldos.filter(x => x.fundoId !== id);
+        commit();
+        toast(`Fundo “${f.nome}” excluído`, 'success', () => { Object.assign(state, backup); commit(id); });
+        break;
+      }
+      case 'tema': {
+        const dark = !document.documentElement.classList.contains('dark');
+        try { localStorage.setItem('cgi-tema', dark ? 'dark' : 'light'); } catch (err) {}
+        document.documentElement.classList.toggle('dark', dark);
+        break;
+      }
+      case 'exportar': modalExportar(); break;
+      case 'importar': modalImportar(); break;
+      case 'exemplo': {
+        if ((state.fundos.length || state.dividendos.length || state.gastos.length) && !state.config.exemplo &&
+          !await confirmar('Carregar exemplo', 'Substituir os seus dados atuais pelos dados de exemplo?', 'Substituir')) return;
+        const antes = JSON.parse(JSON.stringify(state));
+        state = { ...exemplo(), config: { ...state.config, ano: new Date().getFullYear(), exemplo: true } };
+        commit();
+        toast('Dados de exemplo carregados', 'success', () => { state = antes; commit(); });
+        break;
+      }
+      case 'zerar':
+      case 'limpar': {
+        if (btn.dataset.action === 'limpar' &&
+          !await confirmar('Apagar todos os dados', 'Todos os fundos, movimentações, saldos e dividendos serão apagados. Você poderá desfazer apenas nos próximos segundos.', 'Apagar tudo')) return;
+        const antes = JSON.parse(JSON.stringify(state));
+        state = { ...defaults(), config: { ...defaults().config, aliquotaIR: state.config.aliquotaIR, secao: state.config.secao } };
+        commit();
+        toast(btn.dataset.action === 'zerar' ? 'Exemplo removido. Cadastre seu primeiro fundo.' : 'Todos os dados foram apagados', 'success', () => { state = antes; commit(); });
+        break;
+      }
+    }
+  });
+
+  $('#file-import').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    try {
+      importarJSON(await file.text());
+      fecharModalAtual?.();
+    } catch (err) { toast('Arquivo inválido. Use um backup exportado por este painel.', 'error'); }
+  });
+
+  $('#sel-ano').addEventListener('change', e => { state.config.ano = +e.target.value; save(); render(); });
+  $('#tgl-neg').addEventListener('click', () => {
+    state.config.mostrarNegativo = !state.config.mostrarNegativo; save(); render();
+    toast(state.config.mostrarNegativo ? 'Quedas exibidas com valor negativo' : 'Quedas exibidas como zero', 'info');
+  });
+  $('#filtro-hist').addEventListener('change', () => { renderHist(); lucide.createIcons(); });
+  $('#filtro-saldo').addEventListener('change', () => { renderSaldos(); lucide.createIcons(); });
+  ['#cfg-ir', '#cfg-ir-m'].forEach(s => $(s).addEventListener('change', e => {
+    const v = parseValor(e.target.value);
+    if (!isFinite(v) || v < 0 || v > 100) { e.target.value = String(state.config.aliquotaIR).replace('.', ','); return toast('Alíquota deve estar entre 0 e 100.', 'error'); }
+    state.config.aliquotaIR = v; save(); render(); toast(`Alíquota de IR ajustada para ${num(v)}%`, 'info');
+  }));
+
+  // ---------- Dados de exemplo ----------
+  function exemplo() {
+    const ano = new Date().getFullYear(), mesAtual = new Date().getMonth(); // meses fechados: 0..mesAtual-1
+    const ultimo = Math.max(mesAtual, 3);
+    const fundos = [
+      { id: 'f1', nome: 'CDB 110% CDI', banco: 'Nubank', isento: false },
+      { id: 'f2', nome: 'Tesouro IPCA+ 2035', banco: 'XP Investimentos', isento: false },
+      { id: 'f3', nome: 'LCI 95% CDI', banco: 'Banco Inter', isento: true },
+    ];
+    const movs = [
+      ['f1', `${ano}-01-05`, 5000], ['f1', `${ano}-03-10`, 1500], ['f1', `${ano}-06-15`, -800],
+      ['f2', `${ano}-01-12`, 3000], ['f2', `${ano}-04-08`, 1000],
+      ['f3', `${ano}-02-20`, 4000], ['f3', `${ano}-05-02`, 2000],
+    ];
+    const historico = movs.map(([fundoId, data, valor]) => ({ id: uid(), fundoId, data, valor }));
+    const taxas = { f1: [0.0098, 0.0091, 0.0101, 0.0095, 0.0104, 0.0097, 0.0099, 0.0102, 0.0096, 0.0100, 0.0094, 0.0099],
+      f2: [0.011, 0.006, -0.004, 0.012, 0.009, -0.007, 0.013, 0.008, 0.010, 0.005, 0.011, 0.009],
+      f3: [0.0085, 0.0080, 0.0088, 0.0084, 0.0090, 0.0086, 0.0087, 0.0089, 0.0083, 0.0088, 0.0085, 0.0087] };
+    const saldos = [];
+    for (const f of fundos) {
+      let bal = 0, vivo = false;
+      for (let m = 0; m < ultimo; m++) {
+        const ap = movs.filter(x => x[0] === f.id && +x[1].slice(5, 7) === m + 1).reduce((s, x) => s + x[2], 0);
+        if (ap) vivo = true;
+        if (!vivo) continue;
+        bal = round2((bal + ap) * (1 + taxas[f.id][m]));
+        saldos.push({ id: uid(), fundoId: f.id, mes: `${ano}-${pad(m + 1)}`, valor: bal });
+      }
+    }
+    const dividendos = [];
+    const fiis = [['MXRF11', 'FII', 18.4], ['HGLG11', 'FII', 33.0], ['KNRI11', 'FII', 24.5]];
+    for (let m = 0; m < ultimo; m++) {
+      for (const [ativo, tipo, base] of fiis) dividendos.push({ id: uid(), ativo, tipo, data: `${ano}-${pad(m + 1)}-15`, valor: round2(base * (0.95 + ((m * 7 + ativo.length) % 10) / 100)) });
+      if (m % 3 === 2) dividendos.push({ id: uid(), ativo: 'ITSA4', tipo: 'Ação', data: `${ano}-${pad(m + 1)}-01`, valor: 21.6 });
+      if (m === 3 || m === 8) dividendos.push({ id: uid(), ativo: 'BBAS3', tipo: 'Ação', data: `${ano}-${pad(m + 1)}-22`, valor: m === 3 ? 87.3 : 64.9 });
+    }
+    // Gastos: modelos repetidos todo mês, com variação determinística
+    const categorias = categoriasPadrao();
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const diaHoje = new Date().getDate();
+    const modelos = [
+      ['c-mor', 'Aluguel', [5], 1800, 0], ['c-ali', 'Supermercado', [3, 10, 17, 24], 320, 0.35],
+      ['c-ali', 'Restaurante', [13, 27], 95, 0.5], ['c-tra', 'Combustível', [8, 22], 210, 0.25],
+      ['c-tra', 'Aplicativo de transporte', [15], 60, 0.6], ['c-con', 'Energia elétrica', [12], 170, 0.3],
+      ['c-con', 'Internet', [12], 120, 0], ['c-con', 'Água', [18], 85, 0.2], ['c-sau', 'Farmácia', [20], 110, 0.8],
+      ['c-laz', 'Cinema e passeios', [14, 28], 120, 0.6], ['c-edu', 'Curso online', [2], 89, 0], ['c-out', 'Diversos', [25], 150, 0.7],
+    ];
+    const bancoDoGasto = { 'Aluguel': 'Itaú', 'Combustível': 'Itaú', 'Energia elétrica': 'Itaú', 'Água': 'Itaú', 'Internet': 'Itaú',
+      'Cinema e passeios': 'Banco Inter', 'Diversos': 'Banco Inter' };
+    const gastos = [];
+    for (let m = 0; m <= mesAtual; m++) {
+      for (const [categoriaId, descricao, dias, base, varia] of modelos) {
+        for (const d of dias) {
+          if (m === mesAtual && d > diaHoje) continue;
+          gastos.push({ id: uid(), data: `${ano}-${pad(m + 1)}-${pad(d)}`, categoriaId, banco: bancoDoGasto[descricao] || 'Nubank', descricao, valor: round2(base * (1 + (rnd() * 2 - 1) * varia)) });
+        }
+      }
+    }
+    const bancos = ['Nubank', 'Itaú', 'Banco Inter', 'XP Investimentos', 'Banco do Brasil', 'Caixa'];
+    return { fundos, historico, saldos, dividendos, gastos, categorias, bancos };
+  }
+
+  // ---------- Inicialização ----------
+  $('#form-hist [name=data]').value = hoje();
+  $('#form-div [name=data]').value = hoje();
+  $('#form-saldo [name=mes]').value = mesAnterior();
+  syncDataGasto();
+  render();
+})();
+</script>
+</body>
+</html>
