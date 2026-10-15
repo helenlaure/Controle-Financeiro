@@ -298,6 +298,53 @@
         </div>
       </section>
 
+      <!-- ===== SALDO EM CONTA ===== -->
+      <section id="sec-contas" class="secao space-y-6 hidden">
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div class="text-sm font-medium text-slate-500 dark:text-slate-400">Total em contas hoje</div>
+            <div id="contas-total" class="text-3xl font-semibold num tracking-tight mt-1"></div>
+            <div id="contas-total-sub" class="text-xs text-slate-500 dark:text-slate-400 mt-1"></div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md">Informe o saldo de cada conta numa data. Com a atualização automática ligada, o painel soma os recebimentos e desconta os gastos lançados nesse banco depois dessa data. Quando conferir o saldo no app do banco, é só atualizar aqui.</p>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 class="font-semibold">Contas</h2>
+              <span id="contas-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+            </div>
+            <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-contas"></table></div>
+          </div>
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="wallet" class="w-4 h-4 text-emerald-600"></i> Informar saldo</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Se a conta já existir (mesmo banco e nome), o saldo é atualizado.</p>
+            <form id="form-conta" class="grid gap-3">
+              <label class="text-sm">Banco
+                <select name="banco" data-opcional class="inp sel-banco"></select>
+              </label>
+              <label class="text-sm">Conta
+                <input name="nome" required list="lista-tipos-conta" value="Conta corrente" class="inp">
+              </label>
+              <label class="text-sm">Saldo (R$)
+                <input name="saldo" required inputmode="decimal" placeholder="0,00" class="inp num">
+                <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">Se estiver no negativo, use o sinal de menos: -150,00</span>
+              </label>
+              <label class="text-sm">Data do saldo
+                <input name="data" type="date" required class="inp">
+              </label>
+              <label class="text-sm flex items-start gap-2 select-none cursor-pointer">
+                <input name="auto" type="checkbox" checked class="h-4 w-4 mt-0.5 accent-emerald-600">
+                <span>Atualizar com os gastos e recebimentos deste banco</span>
+              </label>
+              <button class="btn-primary w-full mt-1"><i data-lucide="save" class="w-4 h-4"></i> Salvar saldo</button>
+            </form>
+            <datalist id="lista-tipos-conta"><option value="Conta corrente"><option value="Poupança"><option value="Conta salário"><option value="Carteira digital"><option value="Dinheiro em espécie"></datalist>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== RENDA FIXA ===== -->
       <section id="sec-rendafixa" class="secao space-y-6 hidden">
         <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -495,6 +542,7 @@
     { id: 'dashboard', nome: 'Dashboard', icon: 'layout-dashboard', sub: 'Visão executiva do seu patrimônio' },
     { id: 'gastos', nome: 'Gastos Mensais', icon: 'receipt', sub: 'Orçamento por categoria, mês a mês' },
     { id: 'recebimentos', nome: 'Recebimentos', icon: 'hand-coins', sub: 'Salário, Pix e outras entradas, mês a mês' },
+    { id: 'contas', nome: 'Saldo em Conta', icon: 'wallet', sub: 'Quanto você tem hoje em cada conta' },
     { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro' },
     { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo' },
     { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês' },
@@ -547,7 +595,7 @@
   ];
 
   const defaults = () => ({
-    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
+    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], contas: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
     config: { ano: new Date().getFullYear(), mesGastos: new Date().getMonth() + 1, mostrarNegativo: true, aliquotaIR: 15, secao: 'dashboard', exemplo: false, distPor: 'fundo' },
   });
 
@@ -557,6 +605,7 @@
     s.fundos.forEach(f => f.banco && set.add(f.banco));
     s.gastos.forEach(g => g.banco && set.add(g.banco));
     (s.recebimentos || []).forEach(r => r.banco && set.add(r.banco));
+    (s.contas || []).forEach(c => c.banco && set.add(c.banco));
     s.bancos = [...set];
     return s;
   }
@@ -566,7 +615,7 @@
     const def = defaults(), arr = v => Array.isArray(v) ? v : [];
     return sincronizarBancos({
       fundos: arr(d.fundos), historico: arr(d.historico), saldos: arr(d.saldos), dividendos: arr(d.dividendos),
-      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
+      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), contas: arr(d.contas), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
       bancos: Array.isArray(d.bancos) ? d.bancos : def.bancos,
       config: { ...def.config, ...(d.config || {}) },
     });
@@ -589,7 +638,7 @@
   function dadosNuvem(s = state) {
     return {
       fundos: s.fundos, historico: s.historico, saldos: s.saldos, dividendos: s.dividendos,
-      gastos: s.gastos, recebimentos: s.recebimentos, categorias: s.categorias, bancos: s.bancos,
+      gastos: s.gastos, recebimentos: s.recebimentos, contas: s.contas, categorias: s.categorias, bancos: s.bancos,
       config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo },
     };
   }
@@ -816,11 +865,11 @@
 
   function modalRenomearBanco(nomeAtual) {
     const nF = state.fundos.filter(f => f.banco === nomeAtual).length, nG = state.gastos.filter(g => g.banco === nomeAtual).length;
-    const nR = state.recebimentos.filter(r => r.banco === nomeAtual).length;
+    const nR = state.recebimentos.filter(r => r.banco === nomeAtual).length, nC = state.contas.filter(c => c.banco === nomeAtual).length;
     abrirModal('Renomear banco', `
       <form class="grid gap-3 text-slate-800 dark:text-slate-100">
         <label class="text-sm">Novo nome <input id="m-nome" required list="lista-bancos" value="${esc(nomeAtual)}" class="inp"></label>
-        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s), ${nG} gasto(s) e ${nR} recebimento(s) vinculados.</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s), ${nG} gasto(s) , ${nR} recebimento(s) e ${nC} conta(s) vinculados.</p>
       </form>`, [
       { label: 'Cancelar', cls: btnSec, cancelar: true },
       { label: 'Salvar', cls: 'btn-primary', onClick: () => {
@@ -830,11 +879,12 @@
         if (state.bancos.some(b => b !== nomeAtual && b.toLowerCase() === novo.toLowerCase())) {
           invalido($('#m-nome'), 'Já existe um banco com esse nome.'); return true;
         }
-        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos, recebimentos: state.recebimentos }));
+        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos, recebimentos: state.recebimentos, contas: state.contas }));
         state.bancos = state.bancos.map(b => b === nomeAtual ? novo : b);
         state.fundos.forEach(f => { if (f.banco === nomeAtual) f.banco = novo; });
         state.gastos.forEach(g => { if (g.banco === nomeAtual) g.banco = novo; });
         state.recebimentos.forEach(r => { if (r.banco === nomeAtual) r.banco = novo; });
+        state.contas.forEach(c => { if (c.banco === nomeAtual) c.banco = novo; });
         commit(novo);
         toast(`“${nomeAtual}” renomeado para “${novo}”`, 'success', () => { Object.assign(state, antes); commit(nomeAtual); });
       } },
@@ -938,6 +988,15 @@
   const totalLimites = () => state.categorias.reduce((s, c) => s + (+c.limite || 0), 0);
   const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
   const totalReceb = ym => state.recebimentos.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+  // Saldo em conta: valor informado + (recebimentos − gastos do mesmo banco depois da data), se a atualização automática estiver ligada
+  function movimentoDesde(c) {
+    const banco = c.banco || '';
+    const rec = state.recebimentos.filter(r => (r.banco || '') === banco && r.data > c.data).reduce((s, r) => s + r.valor, 0);
+    const gas = state.gastos.filter(g => (g.banco || '') === banco && g.data > c.data).reduce((s, g) => s + g.valor, 0);
+    return { rec, gas, liq: rec - gas };
+  }
+  const saldoAtual = c => c.auto ? round2(c.saldo + movimentoDesde(c).liq) : c.saldo;
+  const totalContas = () => state.contas.reduce((s, c) => s + saldoAtual(c), 0);
   function gastoPorCat(ym) {
     const m = new Map();
     for (const g of state.gastos) if (mesDe(g.data) === ym) m.set(g.categoriaId, (m.get(g.categoriaId) || 0) + g.valor);
@@ -1043,6 +1102,7 @@
     renderGastos();
     renderBancos();
     renderRecebimentos();
+    renderContas();
     $$('.ano-label').forEach(e => e.textContent = state.config.ano);
     $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
     $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
@@ -1122,7 +1182,7 @@
 
   // Aviso no topo: dados de exemplo (em todas as seções) ou boas-vindas (só no Dashboard, com o painel vazio)
   function renderBanner() {
-    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length && !state.recebimentos.length;
+    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length && !state.recebimentos.length && !state.contas.length;
     $('#empty-banner').innerHTML = state.config.exemplo && !vazio ? `
       <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"></i>
@@ -1144,10 +1204,11 @@
     renderBanner();
 
     const div = divDoAno(state.config.ano).reduce((s, d) => s + d.valor, 0);
+    const emConta = totalContas();
     const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites(), rMes = totalReceb(ym), sobra = rMes - gMes;
     const nomeMes = `${MESES_FULL[state.config.mesGastos - 1]} ${state.config.ano}`;
     $('#cards').innerHTML = [
-      card('Patrimônio Total', brl(r.pat), 'wallet', 'Valor atual das aplicações'),
+      card('Patrimônio Total', brl(r.pat + emConta), 'wallet', state.contas.length ? `Investimentos ${brl(r.pat)} + contas ${brl(emConta)}` : 'Valor atual das aplicações'),
       card('Total Investido', brl(r.inv), 'piggy-bank', 'Aportes − resgates'),
       card('Lucro Bruto', brl(r.bruto), 'trending-up', `RF ${brl(r.lucroRF)} + dividendos`, tone(r.bruto)),
       card('Lucro Líquido', brl(r.liquido), 'badge-dollar-sign', `IR estimado: ${brl(r.ir)} (${num(+state.config.aliquotaIR)}%)`, tone(r.liquido)),
@@ -1190,27 +1251,83 @@
       const gAno = gs.filter(g => g.data.startsWith(String(ano))).reduce((s, g) => s + g.valor, 0);
       const rs = state.recebimentos.filter(r => (r.banco || '') === b);
       const rMes = rs.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
-      return { b, nFundos: fs.length, nGastos: gs.length + rs.length, inv, atual, lucro: atual - inv, rMes, gMes, gAno };
+      const cs = state.contas.filter(c => (c.banco || '') === b);
+      const conta = cs.reduce((s, c) => s + saldoAtual(c), 0);
+      return { b, nFundos: fs.length, nGastos: gs.length + rs.length + cs.length, conta, inv, atual, lucro: atual - inv, rMes, gMes, gAno };
     };
     const linhas = bancosOrdenados().map(linha);
-    if (state.gastos.some(g => !g.banco) || state.recebimentos.some(r => !r.banco)) linhas.push(linha(''));
-    linhas.sort((x, y) => (y.atual + y.gAno + y.rMes) - (x.atual + x.gAno + x.rMes));
-    const t = linhas.reduce((s, l) => ({ inv: s.inv + l.inv, atual: s.atual + l.atual, lucro: s.lucro + l.lucro, rMes: s.rMes + l.rMes, gMes: s.gMes + l.gMes, gAno: s.gAno + l.gAno }),
-      { inv: 0, atual: 0, lucro: 0, rMes: 0, gMes: 0, gAno: 0 });
+    if (state.gastos.some(g => !g.banco) || state.recebimentos.some(r => !r.banco) || state.contas.some(c => !c.banco)) linhas.push(linha(''));
+    linhas.sort((x, y) => (y.conta + y.atual + y.gAno + y.rMes) - (x.conta + x.atual + x.gAno + x.rMes));
+    const t = linhas.reduce((s, l) => ({ conta: s.conta + l.conta, inv: s.inv + l.inv, atual: s.atual + l.atual, lucro: s.lucro + l.lucro, rMes: s.rMes + l.rMes, gMes: s.gMes + l.gMes, gAno: s.gAno + l.gAno }),
+      { conta: 0, inv: 0, atual: 0, lucro: 0, rMes: 0, gMes: 0, gAno: 0 });
     const v = (x, cls = '') => Math.abs(x) < EPS ? `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>` : `<td class="td text-right num ${cls}">${brl(x)}</td>`;
-    $('#tbl-bancos').innerHTML = `<thead><tr><th class="th">Banco / Corretora</th><th class="th text-right">Fundos</th><th class="th text-right">Investido</th><th class="th text-right">Valor atual</th>
+    $('#tbl-bancos').innerHTML = `<thead><tr><th class="th">Banco / Corretora</th><th class="th text-right">Fundos</th><th class="th text-right">Saldo em conta</th><th class="th text-right">Investido</th><th class="th text-right">Valor atual</th>
       <th class="th text-right">Lucro</th><th class="th text-right">Recebido no mês</th><th class="th text-right">Gastos no mês</th><th class="th text-right">Gastos em ${ano}</th><th class="th"></th></tr></thead>
       <tbody>${linhas.map(l => {
         const usado = l.nFundos || l.nGastos;
         return `<tr class="${l.b && l.b === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
           <td class="td font-medium ${usado ? '' : 'text-slate-400'}">${esc(l.b || 'Não informado')}${usado ? '' : ' <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5">sem uso</span>'}</td>
           ${l.nFundos ? `<td class="td text-right num">${l.nFundos}</td>` : '<td class="td text-right text-slate-300 dark:text-slate-600">—</td>'}
-          ${v(l.inv)}${v(l.atual)}${v(l.lucro, 'font-medium ' + tone(l.lucro))}${v(l.rMes, 'text-emerald-600 dark:text-emerald-400')}${v(l.gMes)}${v(l.gAno)}
+          ${v(l.conta, l.conta < 0 ? 'text-rose-600 dark:text-rose-400' : '')}${v(l.inv)}${v(l.atual)}${v(l.lucro, 'font-medium ' + tone(l.lucro))}${v(l.rMes, 'text-emerald-600 dark:text-emerald-400')}${v(l.gMes)}${v(l.gAno)}
           <td class="td text-right whitespace-nowrap">${l.b ? `<button class="btn-edit" data-action="edit-banco" data-id="${esc(l.b)}" title="Renomear banco"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-banco" data-id="${esc(l.b)}" title="Excluir banco"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}</td></tr>`;
-      }).join('') || emptyRow(9, 'Nenhum banco cadastrado.')}</tbody>
+      }).join('') || emptyRow(10, 'Nenhum banco cadastrado.')}</tbody>
       <tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="2">Total</td>
-        <td class="td text-right num">${brl(t.inv)}</td><td class="td text-right num">${brl(t.atual)}</td><td class="td text-right num ${tone(t.lucro)}">${brl(t.lucro)}</td>
+        <td class="td text-right num ${t.conta < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(t.conta)}</td><td class="td text-right num">${brl(t.inv)}</td><td class="td text-right num">${brl(t.atual)}</td><td class="td text-right num ${tone(t.lucro)}">${brl(t.lucro)}</td>
         <td class="td text-right num">${brl(t.rMes)}</td><td class="td text-right num">${brl(t.gMes)}</td><td class="td text-right num">${brl(t.gAno)}</td><td class="td"></td></tr></tfoot>`;
+  }
+
+  // ---------- Saldo em conta ----------
+  function renderContas() {
+    const total = totalContas();
+    $('#contas-total').innerHTML = `<span class="${total < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(total)}</span>`;
+    $('#contas-total-sub').textContent = state.contas.length ? `Em ${state.contas.length} ${state.contas.length === 1 ? 'conta' : 'contas'}` : 'Nenhuma conta informada ainda';
+    $('#contas-count').textContent = `${state.contas.length} ${state.contas.length === 1 ? 'conta' : 'contas'}`;
+    const lista = [...state.contas].sort((a, b) => (a.banco || '').localeCompare(b.banco || '', 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const sinal = v => `<span class="${tone(v)}">${sign(v)}${brl(v)}</span>`;
+    $('#tbl-contas').innerHTML = `<thead><tr><th class="th">Conta</th><th class="th">Banco</th><th class="th text-right">Saldo informado</th><th class="th text-right">Desde então</th><th class="th text-right">Saldo hoje</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(c => {
+        const m = movimentoDesde(c), atual = saldoAtual(c);
+        return `<tr class="${c.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="td font-medium">${esc(c.nome)}</td>
+          <td class="td ${c.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(c.banco || 'Sem banco')}</td>
+          <td class="td text-right"><div class="num">${brl(c.saldo)}</div><div class="text-[11px] text-slate-400">em ${fmtData(c.data)}</div></td>
+          <td class="td text-right">${c.auto
+            ? (Math.abs(m.liq) < EPS ? '<span class="text-slate-400">—</span>' : `<div class="num">${sinal(m.liq)}</div><div class="text-[11px] leading-tight text-slate-400 num">+${brl(m.rec)} recebido<br>−${brl(m.gas)} gasto</div>`)
+            : '<span class="text-[11px] text-slate-400">atualização manual</span>'}</td>
+          <td class="td text-right num font-semibold ${atual < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(atual)}</td>
+          <td class="td text-right"><button class="btn-edit" data-action="edit-conta" data-id="${c.id}" title="Atualizar saldo"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-conta" data-id="${c.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
+      }).join('') || emptyRow(6, 'Nenhuma conta ainda. Use o formulário ao lado para informar o saldo.')}</tbody>
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total</td><td class="td text-right num ${total < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+  }
+
+  // Só uma conta por banco recebe os lançamentos automaticamente (evita contar duas vezes)
+  function exclusividadeAuto(c) {
+    if (!c.auto) return false;
+    let mudou = false;
+    for (const o of state.contas) if (o !== c && (o.banco || '') === (c.banco || '') && o.auto) { o.auto = false; mudou = true; }
+    return mudou;
+  }
+
+  function editarConta(id) {
+    const c = state.contas.find(x => x.id === id);
+    if (!c) return;
+    modalForm('Atualizar saldo', [
+      { id: 'banco', label: 'Banco', type: 'select', value: c.banco || '', options: [['', 'Sem banco'], ...bancosOrdenados().map(b => [b, b])] },
+      { id: 'nome', label: 'Conta', value: c.nome, list: 'lista-tipos-conta' },
+      { id: 'saldo', label: 'Saldo (R$)', type: 'valor', value: c.saldo },
+      { id: 'data', label: 'Data do saldo', type: 'date', value: c.data },
+      { id: 'auto', label: 'Atualizar com os gastos e recebimentos deste banco', type: 'select', value: c.auto ? 'sim' : 'nao', options: [['sim', 'Sim'], ['nao', 'Não, só o valor informado']] },
+    ], v => {
+      if (!v.nome) return ['nome', 'Informe o nome da conta.'];
+      if (!isFinite(v.saldo)) return ['saldo', 'Informe um saldo válido.'];
+      if (!v.data) return ['data', 'Informe a data do saldo.'];
+      if (state.contas.some(x => x.id !== id && (x.banco || '') === v.banco && x.nome.toLowerCase() === v.nome.toLowerCase())) return ['nome', 'Já existe uma conta com esse nome neste banco.'];
+      const antes = JSON.parse(JSON.stringify(state.contas));
+      Object.assign(c, { banco: v.banco, nome: v.nome, saldo: round2(v.saldo), data: v.data, auto: v.auto === 'sim' });
+      const desligou = exclusividadeAuto(c);
+      commit(id);
+      toast(desligou ? 'Saldo atualizado. A outra conta deste banco passou para atualização manual.' : 'Saldo atualizado', 'success', () => { state.contas = antes; commit(id); });
+    });
   }
 
   // ---------- Recebimentos ----------
@@ -1642,6 +1759,23 @@
     else toast(`Gasto de ${brl(v)} lançado em ${cat.nome}`);
   });
 
+  $('#form-conta').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target, nome = fm.nome.value.trim().replace(/\s+/g, ' ');
+    if (!nome) return invalido(fm.nome, 'Informe o nome da conta.');
+    const saldo = parseValor(fm.saldo.value);
+    if (!isFinite(saldo)) return invalido(fm.saldo, 'Informe um saldo válido. Para saldo negativo, use o sinal de menos.');
+    const banco = fm.banco.value;
+    let c = state.contas.find(x => (x.banco || '') === banco && x.nome.toLowerCase() === nome.toLowerCase());
+    const existia = !!c;
+    if (c) Object.assign(c, { saldo: round2(saldo), data: fm.data.value, auto: fm.auto.checked });
+    else { c = { id: uid(), banco, nome, saldo: round2(saldo), data: fm.data.value, auto: fm.auto.checked }; state.contas.push(c); }
+    const desligou = exclusividadeAuto(c);
+    fm.saldo.value = '';
+    commit(c.id);
+    toast(`${existia ? 'Saldo atualizado' : 'Conta adicionada'}: ${nome}${banco ? ' · ' + banco : ''}${desligou ? '. A outra conta deste banco passou para atualização manual.' : ''}`);
+  });
+
   $('#form-receb').addEventListener('submit', e => {
     e.preventDefault();
     const fm = e.target;
@@ -1748,10 +1882,12 @@
       case 'del-div': removerComUndo('dividendos', id, 'Dividendo excluído'); break;
       case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
       case 'del-receb': removerComUndo('recebimentos', id, 'Recebimento excluído'); break;
+      case 'del-conta': removerComUndo('contas', id, 'Conta excluída'); break;
       case 'nuvem': nuvem.clique(); break;
       case 'edit-fundo': modalEditarFundo(id); break;
       case 'edit-gasto': editarGasto(id); break;
       case 'edit-receb': editarReceb(id); break;
+      case 'edit-conta': editarConta(id); break;
       case 'edit-hist': editarMov(id); break;
       case 'edit-saldo': editarSaldo(id); break;
       case 'edit-div': editarDividendo(id); break;
@@ -1759,8 +1895,8 @@
       case 'dist': state.config.distPor = btn.dataset.por; save(); renderDistribuicao(resumo().pat); break;
       case 'del-banco': {
         const nF = state.fundos.filter(f => f.banco === id).length, nG = state.gastos.filter(g => g.banco === id).length;
-        const nR = state.recebimentos.filter(r => r.banco === id).length;
-        if (nF || nG || nR) return toast(`“${id}” está em uso por ${nF} fundo(s), ${nG} gasto(s) e ${nR} recebimento(s). Altere esses registros antes.`, 'error');
+        const nR = state.recebimentos.filter(r => r.banco === id).length, nC = state.contas.filter(c => c.banco === id).length;
+        if (nF || nG || nR || nC) return toast(`“${id}” está em uso por ${nF} fundo(s), ${nG} gasto(s), ${nR} recebimento(s) e ${nC} conta(s). Altere esses registros antes.`, 'error');
         const idx = state.bancos.indexOf(id);
         state.bancos.splice(idx, 1);
         commit();
@@ -1910,7 +2046,13 @@
       if (m % 2 === 1 && (m < mesAtual || diaHoje >= 18)) recebimentos.push({ id: uid(), data: `${ano}-${mm}-18`, tipo: 'Freelance / extra', banco: 'Nubank', descricao: 'Projeto freelance', valor: round2(650 + rnd() * 500) });
       if (m < mesAtual || diaHoje >= 12) recebimentos.push({ id: uid(), data: `${ano}-${mm}-12`, tipo: 'Pix recebido', banco: 'Nubank', descricao: 'Pix da família', valor: round2(80 + rnd() * 120) });
     }
-    return { fundos, historico, saldos, dividendos, gastos, recebimentos, categorias, bancos };
+    const inicioMes = `${ano}-${pad(mesAtual + 1)}-01`;
+    const contas = [
+      { id: uid(), banco: 'Itaú', nome: 'Conta corrente', saldo: 2350, data: inicioMes, auto: true },
+      { id: uid(), banco: 'Itaú', nome: 'Poupança', saldo: 5000, data: inicioMes, auto: false },
+      { id: uid(), banco: 'Nubank', nome: 'Conta', saldo: 820.5, data: inicioMes, auto: true },
+    ];
+    return { fundos, historico, saldos, dividendos, gastos, recebimentos, contas, categorias, bancos };
   }
 
   // ---------- Sincronização na nuvem (Firebase) ----------
@@ -1976,7 +2118,7 @@
       if (rod) rod.lastChild.textContent = usuario ? ` Dados salvos neste navegador e sincronizados com a nuvem (${usuario.email}).` : ' Dados salvos automaticamente neste navegador.';
     }
 
-    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length;
+    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length && !(d.contas || []).length;
     const nomeDispositivo = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'celular' : 'computador';
 
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
@@ -1993,7 +2135,7 @@
       const porId = campo => { const m = new Map(); for (const x of remoto[campo] || []) m.set(x.id, x); for (const x of local[campo] || []) m.set(x.id, x); return [...m.values()]; };
       return {
         fundos: porId('fundos'), historico: porId('historico'), saldos: porId('saldos'), dividendos: porId('dividendos'),
-        gastos: porId('gastos'), recebimentos: porId('recebimentos'), categorias: porId('categorias'),
+        gastos: porId('gastos'), recebimentos: porId('recebimentos'), contas: porId('contas'), categorias: porId('categorias'),
         bancos: [...new Set([...(remoto.bancos || []), ...(local.bancos || [])])],
         config: { ...(remoto.config || {}), ...local.config, exemplo: false },
       };
@@ -2181,6 +2323,7 @@
   $('#form-div [name=data]').value = hoje();
   $('#form-saldo [name=mes]').value = mesAnterior();
   syncDataGasto();
+  $('#form-conta [name=data]').value = hoje();
   render();
   nuvem.iniciar();
 })();
