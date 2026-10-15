@@ -218,6 +218,65 @@
         </div>
       </section>
 
+      <!-- ===== RECEBIMENTOS ===== -->
+      <section id="sec-recebimentos" class="secao space-y-6 hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <button data-action="mes-ant" title="Mês anterior" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <select id="sel-mes-receb" aria-label="Mês" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+            <button data-action="mes-prox" title="Próximo mês" class="h-9 w-9 grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+          </div>
+          <div id="receb-kpis" class="flex flex-wrap gap-x-6 gap-y-1 text-sm"></div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 class="font-semibold">Recebimentos de <span id="receb-mes-label"></span></h2>
+              <span id="receb-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+            </div>
+            <div class="overflow-x-auto scroll-thin max-h-[520px]"><table class="w-full text-sm" id="tbl-receb"></table></div>
+          </div>
+          <div class="space-y-6 min-w-0">
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="hand-coins" class="w-4 h-4 text-emerald-600"></i> Novo recebimento</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Salário, Pix, pagamentos e qualquer dinheiro que entrou.</p>
+              <form id="form-receb" class="grid gap-3">
+                <label class="text-sm">Data
+                  <input name="data" type="date" required class="inp">
+                </label>
+                <label class="text-sm">Tipo
+                  <select name="tipo" class="inp"><option>Salário</option><option>Pix recebido</option><option>Pagamento recebido</option><option>Freelance / extra</option><option>Vale / benefício</option><option>Reembolso / devolução</option><option>Outros</option></select>
+                </label>
+                <label class="text-sm">Banco / conta que recebeu
+                  <select name="banco" data-opcional class="inp sel-banco"></select>
+                </label>
+                <label class="text-sm">Descrição
+                  <input name="descricao" placeholder="Ex.: Salário de outubro" class="inp">
+                </label>
+                <label class="text-sm">Valor (R$)
+                  <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+                </label>
+                <button class="btn-primary w-full mt-1"><i data-lucide="plus" class="w-4 h-4"></i> Lançar recebimento</button>
+              </form>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 class="font-semibold mb-1">Recebido por tipo</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Neste mês</p>
+              <div id="receb-por-tipo" class="space-y-3"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 class="font-semibold">Entradas e saídas — <span class="ano-label"></span></h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Recebimentos por tipo, mês a mês, comparados com os gastos. Sobra = recebido − gasto.</p>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-receb-matriz"></table></div>
+        </div>
+      </section>
+
       <!-- ===== BANCOS ===== -->
       <section id="sec-bancos" class="secao space-y-6 hidden">
         <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -233,7 +292,7 @@
         <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 class="font-semibold">Consolidado por banco</h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Investimentos atuais e gastos de <span id="bancos-mes-label"></span>. Um banco só pode ser excluído quando não tiver fundos nem gastos vinculados.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Investimentos atuais, recebimentos e gastos de <span id="bancos-mes-label"></span>. Um banco só pode ser excluído quando não tiver fundos, gastos nem recebimentos vinculados.</p>
           </div>
           <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-bancos"></table></div>
         </div>
@@ -435,6 +494,7 @@
   const SECOES = [
     { id: 'dashboard', nome: 'Dashboard', icon: 'layout-dashboard', sub: 'Visão executiva do seu patrimônio' },
     { id: 'gastos', nome: 'Gastos Mensais', icon: 'receipt', sub: 'Orçamento por categoria, mês a mês' },
+    { id: 'recebimentos', nome: 'Recebimentos', icon: 'hand-coins', sub: 'Salário, Pix e outras entradas, mês a mês' },
     { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro' },
     { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo' },
     { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês' },
@@ -487,15 +547,16 @@
   ];
 
   const defaults = () => ({
-    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
+    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
     config: { ano: new Date().getFullYear(), mesGastos: new Date().getMonth() + 1, mostrarNegativo: true, aliquotaIR: 15, secao: 'dashboard', exemplo: false, distPor: 'fundo' },
   });
 
-  // Garante que todo banco usado em fundos ou gastos está no cadastro
+  // Garante que todo banco usado em fundos, gastos ou recebimentos está no cadastro
   function sincronizarBancos(s) {
     const set = new Set(s.bancos);
     s.fundos.forEach(f => f.banco && set.add(f.banco));
     s.gastos.forEach(g => g.banco && set.add(g.banco));
+    (s.recebimentos || []).forEach(r => r.banco && set.add(r.banco));
     s.bancos = [...set];
     return s;
   }
@@ -505,7 +566,7 @@
     const def = defaults(), arr = v => Array.isArray(v) ? v : [];
     return sincronizarBancos({
       fundos: arr(d.fundos), historico: arr(d.historico), saldos: arr(d.saldos), dividendos: arr(d.dividendos),
-      gastos: arr(d.gastos), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
+      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
       bancos: Array.isArray(d.bancos) ? d.bancos : def.bancos,
       config: { ...def.config, ...(d.config || {}) },
     });
@@ -528,7 +589,7 @@
   function dadosNuvem(s = state) {
     return {
       fundos: s.fundos, historico: s.historico, saldos: s.saldos, dividendos: s.dividendos,
-      gastos: s.gastos, categorias: s.categorias, bancos: s.bancos,
+      gastos: s.gastos, recebimentos: s.recebimentos, categorias: s.categorias, bancos: s.bancos,
       config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo },
     };
   }
@@ -674,6 +735,27 @@
     });
   }
 
+  function editarReceb(id) {
+    const r = state.recebimentos.find(x => x.id === id);
+    if (!r) return;
+    const tipos = TIPOS_RECEB.includes(r.tipo) ? TIPOS_RECEB : [...TIPOS_RECEB, r.tipo];
+    modalForm('Editar recebimento', [
+      { id: 'data', label: 'Data', type: 'date', value: r.data },
+      { id: 'tipo', label: 'Tipo', type: 'select', value: r.tipo, options: tipos.map(t => [t, t]) },
+      { id: 'banco', label: 'Banco / conta que recebeu', type: 'select', value: r.banco || '', options: [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b])] },
+      { id: 'descricao', label: 'Descrição', value: r.descricao },
+      { id: 'valor', label: 'Valor (R$)', type: 'valor', value: r.valor },
+    ], v => {
+      if (!v.data) return ['data', 'Informe a data.'];
+      if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
+      const antes = { ...r };
+      Object.assign(r, { data: v.data, tipo: v.tipo, banco: v.banco, descricao: v.descricao || v.tipo, valor: round2(v.valor) });
+      state.config.ano = +v.data.slice(0, 4); state.config.mesGastos = +v.data.slice(5, 7);
+      commit(id);
+      toast('Recebimento atualizado', 'success', () => { Object.assign(r, antes); commit(id); });
+    });
+  }
+
   function editarMov(id) {
     const h = state.historico.find(x => x.id === id);
     if (!h) return;
@@ -734,10 +816,11 @@
 
   function modalRenomearBanco(nomeAtual) {
     const nF = state.fundos.filter(f => f.banco === nomeAtual).length, nG = state.gastos.filter(g => g.banco === nomeAtual).length;
+    const nR = state.recebimentos.filter(r => r.banco === nomeAtual).length;
     abrirModal('Renomear banco', `
       <form class="grid gap-3 text-slate-800 dark:text-slate-100">
         <label class="text-sm">Novo nome <input id="m-nome" required list="lista-bancos" value="${esc(nomeAtual)}" class="inp"></label>
-        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s) e ${nG} gasto(s) vinculados.</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s), ${nG} gasto(s) e ${nR} recebimento(s) vinculados.</p>
       </form>`, [
       { label: 'Cancelar', cls: btnSec, cancelar: true },
       { label: 'Salvar', cls: 'btn-primary', onClick: () => {
@@ -747,10 +830,11 @@
         if (state.bancos.some(b => b !== nomeAtual && b.toLowerCase() === novo.toLowerCase())) {
           invalido($('#m-nome'), 'Já existe um banco com esse nome.'); return true;
         }
-        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos }));
+        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos, recebimentos: state.recebimentos }));
         state.bancos = state.bancos.map(b => b === nomeAtual ? novo : b);
         state.fundos.forEach(f => { if (f.banco === nomeAtual) f.banco = novo; });
         state.gastos.forEach(g => { if (g.banco === nomeAtual) g.banco = novo; });
+        state.recebimentos.forEach(r => { if (r.banco === nomeAtual) r.banco = novo; });
         commit(novo);
         toast(`“${nomeAtual}” renomeado para “${novo}”`, 'success', () => { Object.assign(state, antes); commit(nomeAtual); });
       } },
@@ -768,9 +852,9 @@
     toast('Backup importado', 'success', () => { state = antes; commit(); });
   }
 
-  // Arquivo de lançamentos: acrescenta gastos sem substituir os dados atuais
+  // Arquivo de lançamentos: acrescenta gastos e recebimentos sem substituir os dados atuais
   function adicionarLancamentos(d) {
-    if (!Array.isArray(d.gastos)) throw new Error('formato');
+    if (!Array.isArray(d.gastos) && !Array.isArray(d.recebimentos)) throw new Error('formato');
     const antes = JSON.parse(JSON.stringify(state));
     if (state.config.exemplo) {
       const cfg = state.config;
@@ -787,20 +871,29 @@
     for (const b of d.bancos || []) if (!state.bancos.some(x => x.toLowerCase() === b.toLowerCase())) state.bancos.push(b);
     const chave = g => `${g.data}|${round2(g.valor)}|${(g.descricao || '').toLowerCase()}`;
     const existentes = new Set(state.gastos.map(chave));
-    let novos = 0, repetidos = 0;
-    for (const g of d.gastos) {
+    let novos = 0, repetidos = 0, novosR = 0;
+    for (const g of d.gastos || []) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(g.data) || !(+g.valor > 0)) continue;
       if (existentes.has(chave(g))) { repetidos++; continue; }
       state.gastos.push({ id: uid(), data: g.data, categoriaId: mapa[g.categoriaId] || g.categoriaId, banco: g.banco || '', descricao: g.descricao || '', valor: round2(+g.valor) });
       existentes.add(chave(g));
       novos++;
     }
+    const existentesR = new Set(state.recebimentos.map(chave));
+    for (const r of d.recebimentos || []) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.data) || !(+r.valor > 0)) continue;
+      if (existentesR.has(chave(r))) { repetidos++; continue; }
+      state.recebimentos.push({ id: uid(), data: r.data, tipo: r.tipo || 'Outros', banco: r.banco || '', descricao: r.descricao || '', valor: round2(+r.valor) });
+      existentesR.add(chave(r));
+      novosR++;
+    }
     sincronizarBancos(state);
-    const ultima = d.gastos.map(g => g.data).sort().pop();
+    const ultima = [...(d.gastos || []), ...(d.recebimentos || [])].map(g => g.data).sort().pop();
     if (ultima) { state.config.ano = +ultima.slice(0, 4); state.config.mesGastos = +ultima.slice(5, 7); }
-    state.config.secao = 'gastos';
+    state.config.secao = novos ? 'gastos' : 'recebimentos';
     commit();
-    toast(`${novos} gastos adicionados${repetidos ? `, ${repetidos} repetidos ignorados` : ''}`, 'success', () => { state = antes; commit(); });
+    const partes = [novos && `${novos} gastos`, novosR && `${novosR} recebimentos`].filter(Boolean).join(' e ') || 'Nenhum lançamento novo';
+    toast(`${partes} adicionados${repetidos ? `, ${repetidos} repetidos ignorados` : ''}`, 'success', () => { state = antes; commit(); });
   }
 
   function modalExportar() {
@@ -844,6 +937,7 @@
   const mesGastosKey = () => `${state.config.ano}-${pad(state.config.mesGastos)}`;
   const totalLimites = () => state.categorias.reduce((s, c) => s + (+c.limite || 0), 0);
   const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
+  const totalReceb = ym => state.recebimentos.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
   function gastoPorCat(ym) {
     const m = new Map();
     for (const g of state.gastos) if (mesDe(g.data) === ym) m.set(g.categoriaId, (m.get(g.categoriaId) || 0) + g.valor);
@@ -931,6 +1025,7 @@
     state.saldos.forEach(s => anos.add(+s.mes.slice(0, 4)));
     state.dividendos.forEach(d => anos.add(+d.data.slice(0, 4)));
     state.gastos.forEach(g => anos.add(+g.data.slice(0, 4)));
+    state.recebimentos.forEach(r => anos.add(+r.data.slice(0, 4)));
     return [...anos].filter(Boolean).sort((a, b) => b - a);
   }
 
@@ -947,6 +1042,7 @@
     renderDiv();
     renderGastos();
     renderBancos();
+    renderRecebimentos();
     $$('.ano-label').forEach(e => e.textContent = state.config.ano);
     $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
     $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
@@ -1026,7 +1122,7 @@
 
   // Aviso no topo: dados de exemplo (em todas as seções) ou boas-vindas (só no Dashboard, com o painel vazio)
   function renderBanner() {
-    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length;
+    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length && !state.recebimentos.length;
     $('#empty-banner').innerHTML = state.config.exemplo && !vazio ? `
       <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"></i>
@@ -1035,9 +1131,10 @@
       <div class="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5"></i>
           <div><div class="font-semibold">Seu painel está pronto para uso</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300">Lance seus gastos em Gastos Mensais e defina o limite de cada categoria. Para investimentos, cadastre os fundos em Renda Fixa.</div></div></div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">Lance seus gastos em Gastos Mensais e o que você recebe (salário, Pix…) em Recebimentos. Para investimentos, cadastre os fundos em Renda Fixa.</div></div></div>
         <div class="flex flex-wrap gap-2 shrink-0">
           <button data-secao="gastos" class="btn-primary">Lançar gastos</button>
+          <button data-secao="recebimentos" class="rounded-lg border border-emerald-600 text-emerald-700 dark:text-emerald-300 px-3 py-2 text-sm font-medium">Lançar recebimentos</button>
           <button data-secao="rendafixa" class="rounded-lg border border-emerald-600 text-emerald-700 dark:text-emerald-300 px-3 py-2 text-sm font-medium">Cadastrar fundo</button>
         </div></div>` : '';
   }
@@ -1047,17 +1144,18 @@
     renderBanner();
 
     const div = divDoAno(state.config.ano).reduce((s, d) => s + d.valor, 0);
-    const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites();
+    const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites(), rMes = totalReceb(ym), sobra = rMes - gMes;
     const nomeMes = `${MESES_FULL[state.config.mesGastos - 1]} ${state.config.ano}`;
     $('#cards').innerHTML = [
-      card('Patrimônio Total', brl(r.pat), 'wallet', 'Valor atual das aplicações', '', 'sm:col-span-2'),
+      card('Patrimônio Total', brl(r.pat), 'wallet', 'Valor atual das aplicações'),
       card('Total Investido', brl(r.inv), 'piggy-bank', 'Aportes − resgates'),
       card('Lucro Bruto', brl(r.bruto), 'trending-up', `RF ${brl(r.lucroRF)} + dividendos`, tone(r.bruto)),
       card('Lucro Líquido', brl(r.liquido), 'badge-dollar-sign', `IR estimado: ${brl(r.ir)} (${num(+state.config.aliquotaIR)}%)`, tone(r.liquido)),
       card('Dividendos Recebidos', brl(r.div), 'coins', `Em ${state.config.ano}: ${brl(div)}`),
+      card('Rentabilidade Geral', `${sign(r.rent)}${pct(r.rent)}`, 'percent', `Líquida: ${sign(r.rentLiq)}${pct(r.rentLiq)}`, tone(r.rent)),
+      card('Recebido no Mês', brl(rMes), 'hand-coins', `${nomeMes} · sobra <span class="font-medium ${tone(sobra)}">${sign(sobra)}${brl(sobra)}</span>`),
       card('Gastos Totais do Mês', brl(gMes), 'receipt', `${nomeMes} · ${lim ? pct(gMes / lim) + ' do orçamento' : 'sem orçamento definido'}`,
         lim && gMes > lim ? 'text-rose-600 dark:text-rose-400' : ''),
-      card('Rentabilidade Geral', `${sign(r.rent)}${pct(r.rent)}`, 'percent', `Líquida: ${sign(r.rentLiq)}${pct(r.rentLiq)}`, tone(r.rent)),
     ].join('');
 
     renderChart();
@@ -1090,27 +1188,88 @@
       const gs = state.gastos.filter(g => (g.banco || '') === b);
       const gMes = gs.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
       const gAno = gs.filter(g => g.data.startsWith(String(ano))).reduce((s, g) => s + g.valor, 0);
-      return { b, nFundos: fs.length, nGastos: gs.length, inv, atual, lucro: atual - inv, gMes, gAno };
+      const rs = state.recebimentos.filter(r => (r.banco || '') === b);
+      const rMes = rs.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+      return { b, nFundos: fs.length, nGastos: gs.length + rs.length, inv, atual, lucro: atual - inv, rMes, gMes, gAno };
     };
     const linhas = bancosOrdenados().map(linha);
-    if (state.gastos.some(g => !g.banco)) linhas.push(linha(''));
-    linhas.sort((x, y) => (y.atual + y.gAno) - (x.atual + x.gAno));
-    const t = linhas.reduce((s, l) => ({ inv: s.inv + l.inv, atual: s.atual + l.atual, lucro: s.lucro + l.lucro, gMes: s.gMes + l.gMes, gAno: s.gAno + l.gAno }),
-      { inv: 0, atual: 0, lucro: 0, gMes: 0, gAno: 0 });
+    if (state.gastos.some(g => !g.banco) || state.recebimentos.some(r => !r.banco)) linhas.push(linha(''));
+    linhas.sort((x, y) => (y.atual + y.gAno + y.rMes) - (x.atual + x.gAno + x.rMes));
+    const t = linhas.reduce((s, l) => ({ inv: s.inv + l.inv, atual: s.atual + l.atual, lucro: s.lucro + l.lucro, rMes: s.rMes + l.rMes, gMes: s.gMes + l.gMes, gAno: s.gAno + l.gAno }),
+      { inv: 0, atual: 0, lucro: 0, rMes: 0, gMes: 0, gAno: 0 });
     const v = (x, cls = '') => Math.abs(x) < EPS ? `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>` : `<td class="td text-right num ${cls}">${brl(x)}</td>`;
     $('#tbl-bancos').innerHTML = `<thead><tr><th class="th">Banco / Corretora</th><th class="th text-right">Fundos</th><th class="th text-right">Investido</th><th class="th text-right">Valor atual</th>
-      <th class="th text-right">Lucro</th><th class="th text-right">Gastos no mês</th><th class="th text-right">Gastos em ${ano}</th><th class="th"></th></tr></thead>
+      <th class="th text-right">Lucro</th><th class="th text-right">Recebido no mês</th><th class="th text-right">Gastos no mês</th><th class="th text-right">Gastos em ${ano}</th><th class="th"></th></tr></thead>
       <tbody>${linhas.map(l => {
         const usado = l.nFundos || l.nGastos;
         return `<tr class="${l.b && l.b === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
           <td class="td font-medium ${usado ? '' : 'text-slate-400'}">${esc(l.b || 'Não informado')}${usado ? '' : ' <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5">sem uso</span>'}</td>
           ${l.nFundos ? `<td class="td text-right num">${l.nFundos}</td>` : '<td class="td text-right text-slate-300 dark:text-slate-600">—</td>'}
-          ${v(l.inv)}${v(l.atual)}${v(l.lucro, 'font-medium ' + tone(l.lucro))}${v(l.gMes)}${v(l.gAno)}
+          ${v(l.inv)}${v(l.atual)}${v(l.lucro, 'font-medium ' + tone(l.lucro))}${v(l.rMes, 'text-emerald-600 dark:text-emerald-400')}${v(l.gMes)}${v(l.gAno)}
           <td class="td text-right whitespace-nowrap">${l.b ? `<button class="btn-edit" data-action="edit-banco" data-id="${esc(l.b)}" title="Renomear banco"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-banco" data-id="${esc(l.b)}" title="Excluir banco"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}</td></tr>`;
-      }).join('') || emptyRow(8, 'Nenhum banco cadastrado.')}</tbody>
+      }).join('') || emptyRow(9, 'Nenhum banco cadastrado.')}</tbody>
       <tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="2">Total</td>
         <td class="td text-right num">${brl(t.inv)}</td><td class="td text-right num">${brl(t.atual)}</td><td class="td text-right num ${tone(t.lucro)}">${brl(t.lucro)}</td>
-        <td class="td text-right num">${brl(t.gMes)}</td><td class="td text-right num">${brl(t.gAno)}</td><td class="td"></td></tr></tfoot>`;
+        <td class="td text-right num">${brl(t.rMes)}</td><td class="td text-right num">${brl(t.gMes)}</td><td class="td text-right num">${brl(t.gAno)}</td><td class="td"></td></tr></tfoot>`;
+  }
+
+  // ---------- Recebimentos ----------
+  const TIPOS_RECEB = ['Salário', 'Pix recebido', 'Pagamento recebido', 'Freelance / extra', 'Vale / benefício', 'Reembolso / devolução', 'Outros'];
+
+  function renderRecebimentos() {
+    const ano = state.config.ano, mes = state.config.mesGastos, ym = mesGastosKey();
+    $('#sel-mes-receb').innerHTML = MESES_FULL.map((n, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${n} ${ano}</option>`).join('');
+    $('#receb-mes-label').textContent = `${MESES_FULL[mes - 1]} ${ano}`;
+
+    const lista = state.recebimentos.filter(r => mesDe(r.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
+    const total = lista.reduce((s, r) => s + r.valor, 0), gasto = totalGastos(ym), sobra = total - gasto;
+    const kpi = (rot, val, cls = 'text-slate-800 dark:text-slate-100') =>
+      `<span class="text-slate-500 dark:text-slate-400">${rot} <strong class="num ml-1 ${cls}">${val}</strong></span>`;
+    $('#receb-kpis').innerHTML = kpi('Recebido no mês', brl(total), 'text-emerald-600 dark:text-emerald-400') + kpi('Gasto no mês', brl(gasto)) +
+      kpi(sobra >= 0 ? 'Sobra do mês' : 'Faltou no mês', brl(Math.abs(sobra)), tone(sobra));
+
+    // Lista do mês
+    $('#receb-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
+    $('#tbl-receb').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Tipo</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(r => `<tr class="${r.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td num">${fmtData(r.data)}</td>
+        <td class="td"><span class="text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5">${esc(r.tipo)}</span></td>
+        <td class="td ${r.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(r.banco || 'Não informado')}</td>
+        <td class="td text-slate-600 dark:text-slate-300">${esc(r.descricao)}</td>
+        <td class="td text-right num font-medium text-emerald-600 dark:text-emerald-400">${brl(r.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-receb" data-id="${r.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-receb" data-id="${r.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum recebimento lançado neste mês.')}</tbody>
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês</td><td class="td text-right num text-emerald-600 dark:text-emerald-400">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+
+    // Por tipo no mês
+    const porTipo = new Map();
+    for (const r of lista) porTipo.set(r.tipo, (porTipo.get(r.tipo) || 0) + r.valor);
+    $('#receb-por-tipo').innerHTML = porTipo.size ? [...porTipo].sort((a, b) => b[1] - a[1]).map(([t, v]) => {
+      const p = total > 0 ? v / total : 0;
+      return `<div>
+        <div class="flex justify-between gap-3 text-sm mb-1"><span class="truncate">${esc(t)}</span>
+          <span class="num shrink-0"><span class="font-medium">${brl(v)}</span> <span class="text-xs text-slate-400">${pct(p)}</span></span></div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"><div class="h-full rounded-full bg-emerald-500" style="width:${(p * 100).toFixed(1)}%"></div></div></div>`;
+    }).join('') : `<div class="text-sm text-slate-400">Nenhum recebimento neste mês.</div>`;
+
+    // Matriz tipo × mês, com gastos e sobra
+    const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
+    const doAno = state.recebimentos.filter(r => r.data.startsWith(String(ano)));
+    const tipos = [...TIPOS_RECEB, ...new Set(doAno.map(r => r.tipo).filter(t => !TIPOS_RECEB.includes(t)))].filter(t => doAno.some(r => r.tipo === t));
+    const celula = (v, cls = '') => Math.abs(v) < EPS ? `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>` : `<td class="td text-right num ${cls}">${num(v)}</td>`;
+    const meses = MESES.map((_, i) => `${ano}-${pad(i + 1)}`);
+    const recMes = meses.map(totalReceb), gasMes = meses.map(totalGastos), sobMes = meses.map((_, i) => recMes[i] - gasMes[i]);
+    const soma = a => a.reduce((x, y) => x + y, 0);
+    const corpo = tipos.map(t => {
+      const vals = meses.map(m => doAno.filter(r => r.tipo === t && mesDe(r.data) === m).reduce((s, r) => s + r.valor, 0));
+      return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40"><td class="td ${stickyL} font-medium">${esc(t)}</td>${vals.map(v => celula(v)).join('')}
+        <td class="td text-right num font-semibold bg-slate-50 dark:bg-slate-900/60">${num(soma(vals))}</td></tr>`;
+    }).join('');
+    const linhaTot = (rot, vals, cls) => `<tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td ${stickyL} !bg-slate-50 dark:!bg-slate-900">${rot}</td>
+      ${vals.map((v, i) => recMes[i] || gasMes[i] ? `<td class="td text-right num ${cls(v)}">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
+      <td class="td text-right num ${cls(soma(vals))}">${num(soma(vals))}</td></tr>`;
+    $('#tbl-receb-matriz').innerHTML = `<thead><tr><th class="th ${stickyL} !bg-slate-50 dark:!bg-slate-900 min-w-[170px]">Tipo</th>${MESES.map(n => `<th class="th text-right">${n}</th>`).join('')}<th class="th text-right">Total</th></tr></thead>
+      <tbody>${corpo || emptyRow(14, `Nenhum recebimento lançado em ${ano}.`)}</tbody>
+      <tfoot>${linhaTot('Total recebido', recMes, () => 'text-emerald-600 dark:text-emerald-400')}${linhaTot('Total gasto', gasMes, () => '')}${linhaTot('Sobra do mês', sobMes, tone)}</tfoot>`;
   }
 
   // ---------- Gastos e orçamento ----------
@@ -1133,8 +1292,10 @@
     const porCat = gastoPorCat(ym), total = totalGastos(ym), lim = totalLimites(), resto = lim - total;
     const kpi = (rot, val, cls = 'text-slate-800 dark:text-slate-100') =>
       `<span class="text-slate-500 dark:text-slate-400">${rot} <strong class="num ml-1 ${cls}">${val}</strong></span>`;
+    const receb = totalReceb(ym), sobra = receb - total;
     $('#gastos-kpis').innerHTML = kpi('Gasto no mês', brl(total)) + kpi('Orçamento', brl(lim)) +
-      (lim ? kpi(resto >= 0 ? 'Disponível' : 'Acima do orçamento', brl(Math.abs(resto)), resto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400') : '');
+      (lim ? kpi(resto >= 0 ? 'Disponível' : 'Acima do orçamento', brl(Math.abs(resto)), resto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400') : '') +
+      kpi('Recebido', brl(receb)) + kpi(sobra >= 0 ? 'Sobra do mês' : 'Faltou no mês', brl(Math.abs(sobra)), tone(sobra));
 
     // Orçamento por categoria
     const rows = state.categorias.map(c => {
@@ -1481,6 +1642,20 @@
     else toast(`Gasto de ${brl(v)} lançado em ${cat.nome}`);
   });
 
+  $('#form-receb').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    const v = parseValor(fm.valor.value);
+    if (!isFinite(v) || v <= 0) return invalido(fm.valor, 'Informe um valor maior que zero.');
+    const r = { id: uid(), data: fm.data.value, tipo: fm.tipo.value, banco: fm.banco.value, descricao: fm.descricao.value.trim() || fm.tipo.value, valor: round2(v) };
+    state.recebimentos.push(r);
+    state.config.ano = +r.data.slice(0, 4);
+    state.config.mesGastos = +r.data.slice(5, 7);
+    fm.valor.value = ''; fm.descricao.value = '';
+    commit(r.id);
+    toast(`${r.tipo} de ${brl(v)} lançado`);
+  });
+
   $('#form-banco').addEventListener('submit', e => {
     e.preventDefault();
     const fm = e.target, nome = fm.nome.value.trim().replace(/\s+/g, ' ');
@@ -1528,7 +1703,9 @@
   // Ao trocar o mês, a data do formulário acompanha
   function syncDataGasto() {
     const ym = mesGastosKey();
-    $('#form-gasto [name=data]').value = hoje().startsWith(ym) ? hoje() : `${ym}-01`;
+    const d = hoje().startsWith(ym) ? hoje() : `${ym}-01`;
+    $('#form-gasto [name=data]').value = d;
+    $('#form-receb [name=data]').value = d;
   }
   function mudarMes(delta) {
     let m = state.config.mesGastos + delta, a = state.config.ano;
@@ -1537,6 +1714,7 @@
     save(); syncDataGasto(); render();
   }
   $('#sel-mes-gastos').addEventListener('change', e => { state.config.mesGastos = +e.target.value; save(); syncDataGasto(); render(); });
+  $('#sel-mes-receb').addEventListener('change', e => { state.config.mesGastos = +e.target.value; save(); syncDataGasto(); render(); });
 
   $('#form-hist [name=fundo]').addEventListener('change', updateHintBanco);
   $('#form-div [name=ativo]').addEventListener('change', e => {
@@ -1569,9 +1747,11 @@
       case 'del-saldo': removerComUndo('saldos', id, 'Saldo excluído'); break;
       case 'del-div': removerComUndo('dividendos', id, 'Dividendo excluído'); break;
       case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
+      case 'del-receb': removerComUndo('recebimentos', id, 'Recebimento excluído'); break;
       case 'nuvem': nuvem.clique(); break;
       case 'edit-fundo': modalEditarFundo(id); break;
       case 'edit-gasto': editarGasto(id); break;
+      case 'edit-receb': editarReceb(id); break;
       case 'edit-hist': editarMov(id); break;
       case 'edit-saldo': editarSaldo(id); break;
       case 'edit-div': editarDividendo(id); break;
@@ -1579,7 +1759,8 @@
       case 'dist': state.config.distPor = btn.dataset.por; save(); renderDistribuicao(resumo().pat); break;
       case 'del-banco': {
         const nF = state.fundos.filter(f => f.banco === id).length, nG = state.gastos.filter(g => g.banco === id).length;
-        if (nF || nG) return toast(`“${id}” está em uso por ${nF} fundo(s) e ${nG} gasto(s). Remova ou altere esses registros antes.`, 'error');
+        const nR = state.recebimentos.filter(r => r.banco === id).length;
+        if (nF || nG || nR) return toast(`“${id}” está em uso por ${nF} fundo(s), ${nG} gasto(s) e ${nR} recebimento(s). Altere esses registros antes.`, 'error');
         const idx = state.bancos.indexOf(id);
         state.bancos.splice(idx, 1);
         commit();
@@ -1722,7 +1903,14 @@
       }
     }
     const bancos = ['Nubank', 'Itaú', 'Banco Inter', 'XP Investimentos', 'Banco do Brasil', 'Caixa'];
-    return { fundos, historico, saldos, dividendos, gastos, categorias, bancos };
+    const recebimentos = [];
+    for (let m = 0; m <= mesAtual; m++) {
+      const mm = pad(m + 1);
+      if (m < mesAtual || diaHoje >= 5) recebimentos.push({ id: uid(), data: `${ano}-${mm}-05`, tipo: 'Salário', banco: 'Itaú', descricao: 'Salário', valor: 4800 });
+      if (m % 2 === 1 && (m < mesAtual || diaHoje >= 18)) recebimentos.push({ id: uid(), data: `${ano}-${mm}-18`, tipo: 'Freelance / extra', banco: 'Nubank', descricao: 'Projeto freelance', valor: round2(650 + rnd() * 500) });
+      if (m < mesAtual || diaHoje >= 12) recebimentos.push({ id: uid(), data: `${ano}-${mm}-12`, tipo: 'Pix recebido', banco: 'Nubank', descricao: 'Pix da família', valor: round2(80 + rnd() * 120) });
+    }
+    return { fundos, historico, saldos, dividendos, gastos, recebimentos, categorias, bancos };
   }
 
   // ---------- Sincronização na nuvem (Firebase) ----------
@@ -1788,7 +1976,7 @@
       if (rod) rod.lastChild.textContent = usuario ? ` Dados salvos neste navegador e sincronizados com a nuvem (${usuario.email}).` : ' Dados salvos automaticamente neste navegador.';
     }
 
-    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length;
+    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length;
     const nomeDispositivo = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'celular' : 'computador';
 
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
@@ -1805,7 +1993,7 @@
       const porId = campo => { const m = new Map(); for (const x of remoto[campo] || []) m.set(x.id, x); for (const x of local[campo] || []) m.set(x.id, x); return [...m.values()]; };
       return {
         fundos: porId('fundos'), historico: porId('historico'), saldos: porId('saldos'), dividendos: porId('dividendos'),
-        gastos: porId('gastos'), categorias: porId('categorias'),
+        gastos: porId('gastos'), recebimentos: porId('recebimentos'), categorias: porId('categorias'),
         bancos: [...new Set([...(remoto.bancos || []), ...(local.bancos || [])])],
         config: { ...(remoto.config || {}), ...local.config, exemplo: false },
       };
