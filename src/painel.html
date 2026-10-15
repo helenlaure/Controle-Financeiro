@@ -1501,6 +1501,15 @@
     toast(`Limite de ${c.nome} ajustado para ${brl(c.limite)}`, 'info');
   });
 
+  // Salva o limite enquanto a pessoa digita, para não perder se fechar a página sem sair do campo
+  document.addEventListener('input', e => {
+    const inp = e.target.closest('[data-limite]');
+    const c = inp && catById(inp.dataset.limite);
+    if (!c) return;
+    const v = inp.value.trim() ? parseValor(inp.value) : 0;
+    if (isFinite(v) && v >= 0) { c.limite = round2(v); save(); }
+  });
+
   // Ao trocar o mês, a data do formulário acompanha
   function syncDataGasto() {
     const ym = mesGastosKey();
