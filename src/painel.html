@@ -343,6 +343,42 @@
             <datalist id="lista-tipos-conta"><option value="Conta corrente"><option value="Poupança"><option value="Conta salário"><option value="Carteira digital"><option value="Dinheiro em espécie"></datalist>
           </div>
         </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 class="font-semibold">Transferências entre contas</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Tiram de uma conta e põem na outra. Não contam como gasto nem recebimento.</p>
+              </div>
+              <span id="transf-count" class="text-xs text-slate-500 dark:text-slate-400 shrink-0"></span>
+            </div>
+            <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-transf"></table></div>
+          </div>
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-600"></i> Transferir</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Entre bancos ou entre contas do mesmo banco (ex.: corrente → poupança).</p>
+            <div id="transf-aviso"></div>
+            <form id="form-transf" class="grid gap-3">
+              <label class="text-sm">Data
+                <input name="data" type="date" required class="inp">
+              </label>
+              <label class="text-sm">De
+                <select name="origem" required class="inp sel-conta"></select>
+              </label>
+              <label class="text-sm">Para
+                <select name="destino" required class="inp sel-conta"></select>
+              </label>
+              <label class="text-sm">Valor (R$)
+                <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              </label>
+              <label class="text-sm">Descrição
+                <input name="descricao" placeholder="Ex.: Guardar na poupança" class="inp">
+              </label>
+              <button class="btn-primary w-full mt-1"><i data-lucide="arrow-left-right" class="w-4 h-4"></i> Transferir</button>
+            </form>
+          </div>
+        </div>
       </section>
 
       <!-- ===== RENDA FIXA ===== -->
@@ -595,7 +631,7 @@
   ];
 
   const defaults = () => ({
-    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], contas: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
+    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], contas: [], transferencias: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
     config: { ano: new Date().getFullYear(), mesGastos: new Date().getMonth() + 1, mostrarNegativo: true, aliquotaIR: 15, secao: 'dashboard', exemplo: false, distPor: 'fundo' },
   });
 
@@ -615,7 +651,7 @@
     const def = defaults(), arr = v => Array.isArray(v) ? v : [];
     return sincronizarBancos({
       fundos: arr(d.fundos), historico: arr(d.historico), saldos: arr(d.saldos), dividendos: arr(d.dividendos),
-      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), contas: arr(d.contas), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
+      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), contas: arr(d.contas), transferencias: arr(d.transferencias), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
       bancos: Array.isArray(d.bancos) ? d.bancos : def.bancos,
       config: { ...def.config, ...(d.config || {}) },
     });
@@ -638,7 +674,7 @@
   function dadosNuvem(s = state) {
     return {
       fundos: s.fundos, historico: s.historico, saldos: s.saldos, dividendos: s.dividendos,
-      gastos: s.gastos, recebimentos: s.recebimentos, contas: s.contas, categorias: s.categorias, bancos: s.bancos,
+      gastos: s.gastos, recebimentos: s.recebimentos, contas: s.contas, transferencias: s.transferencias, categorias: s.categorias, bancos: s.bancos,
       config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo },
     };
   }
@@ -989,13 +1025,18 @@
   const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
   const totalReceb = ym => state.recebimentos.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
   // Saldo em conta: valor informado + (recebimentos − gastos do mesmo banco depois da data), se a atualização automática estiver ligada
+  // Transferências valem para qualquer conta (automática ou manual), pois apontam a conta exata
   function movimentoDesde(c) {
     const banco = c.banco || '';
-    const rec = state.recebimentos.filter(r => (r.banco || '') === banco && r.data > c.data).reduce((s, r) => s + r.valor, 0);
-    const gas = state.gastos.filter(g => (g.banco || '') === banco && g.data > c.data).reduce((s, g) => s + g.valor, 0);
-    return { rec, gas, liq: rec - gas };
+    const soma = l => l.reduce((s, x) => s + x.valor, 0);
+    const rec = c.auto ? soma(state.recebimentos.filter(r => (r.banco || '') === banco && r.data > c.data)) : 0;
+    const gas = c.auto ? soma(state.gastos.filter(g => (g.banco || '') === banco && g.data > c.data)) : 0;
+    const tin = soma(state.transferencias.filter(t => t.destino === c.id && t.data > c.data));
+    const tout = soma(state.transferencias.filter(t => t.origem === c.id && t.data > c.data));
+    return { rec, gas, tin, tout, liq: rec - gas + tin - tout };
   }
-  const saldoAtual = c => c.auto ? round2(c.saldo + movimentoDesde(c).liq) : c.saldo;
+  const saldoAtual = c => round2(c.saldo + movimentoDesde(c).liq);
+  const nomeConta = id => { const c = state.contas.find(x => x.id === id); return c ? `${c.nome}${c.banco ? ' · ' + c.banco : ''}` : 'Conta excluída'; };
   const totalContas = () => state.contas.reduce((s, c) => s + saldoAtual(c), 0);
   function gastoPorCat(ym) {
     const m = new Map();
@@ -1103,6 +1144,7 @@
     renderBancos();
     renderRecebimentos();
     renderContas();
+    renderTransferencias();
     $$('.ano-label').forEach(e => e.textContent = state.config.ano);
     $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
     $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
@@ -1151,6 +1193,13 @@
       const v = sel.value;
       sel.innerHTML = catOpts || '<option value="">Crie uma categoria primeiro</option>';
       if (catById(v)) sel.value = v;
+    });
+    const contasOpts = optsContas();
+    $$('.sel-conta').forEach((sel, i) => {
+      const v = sel.value;
+      sel.innerHTML = contasOpts.length ? contasOpts.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('') : '<option value="">Nenhuma conta cadastrada</option>';
+      if (contasOpts.some(([id]) => id === v)) sel.value = v;
+      else if (i % 2 === 1 && contasOpts[1]) sel.value = contasOpts[1][0]; // "Para" começa numa conta diferente de "De"
     });
     const bancos = bancosOrdenados();
     $$('.sel-banco').forEach(sel => {
@@ -1291,13 +1340,64 @@
           <td class="td font-medium">${esc(c.nome)}</td>
           <td class="td ${c.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(c.banco || 'Sem banco')}</td>
           <td class="td text-right"><div class="num">${brl(c.saldo)}</div><div class="text-[11px] text-slate-400">em ${fmtData(c.data)}</div></td>
-          <td class="td text-right">${c.auto
-            ? (Math.abs(m.liq) < EPS ? '<span class="text-slate-400">—</span>' : `<div class="num">${sinal(m.liq)}</div><div class="text-[11px] leading-tight text-slate-400 num">+${brl(m.rec)} recebido<br>−${brl(m.gas)} gasto</div>`)
-            : '<span class="text-[11px] text-slate-400">atualização manual</span>'}</td>
+          <td class="td text-right whitespace-normal min-w-[160px]">${(() => {
+            const det = [];
+            if (c.auto && (m.rec || m.gas)) det.push(`+${brl(m.rec)} recebido`, `−${brl(m.gas)} gasto`);
+            if (m.tin) det.push(`+${brl(m.tin)} transferido para cá`);
+            if (m.tout) det.push(`−${brl(m.tout)} transferido daqui`);
+            if (!c.auto) det.push('atualização manual');
+            const topo = Math.abs(m.liq) < EPS ? (c.auto || m.tin || m.tout ? '<span class="text-slate-400">—</span>' : '') : `<div class="num">${sinal(m.liq)}</div>`;
+            return topo + (det.length ? `<div class="text-[11px] leading-tight text-slate-400 num">${det.join('<br>')}</div>` : '');
+          })()}</td>
           <td class="td text-right num font-semibold ${atual < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(atual)}</td>
           <td class="td text-right"><button class="btn-edit" data-action="edit-conta" data-id="${c.id}" title="Atualizar saldo"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-conta" data-id="${c.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
       }).join('') || emptyRow(6, 'Nenhuma conta ainda. Use o formulário ao lado para informar o saldo.')}</tbody>
       ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total</td><td class="td text-right num ${total < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+  }
+
+  function renderTransferencias() {
+    const lista = [...state.transferencias].sort((a, b) => b.data.localeCompare(a.data));
+    $('#transf-count').textContent = `${lista.length} ${lista.length === 1 ? 'transferência' : 'transferências'}`;
+    $('#transf-aviso').innerHTML = state.contas.length >= 2 ? '' : `
+      <div class="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <i data-lucide="triangle-alert" class="w-4 h-4 shrink-0"></i> Informe o saldo de pelo menos duas contas acima para transferir entre elas.</div>`;
+    $('#tbl-transf').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">De</th><th class="th">Para</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(t => `<tr class="${t.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+        <td class="td num">${fmtData(t.data)}</td>
+        <td class="td whitespace-normal">${esc(nomeConta(t.origem))}</td>
+        <td class="td whitespace-normal">${esc(nomeConta(t.destino))}</td>
+        <td class="td whitespace-normal text-slate-600 dark:text-slate-300">${esc(t.descricao)}</td>
+        <td class="td text-right num font-medium">${brl(t.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="edit-transf" data-id="${t.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-transf" data-id="${t.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhuma transferência ainda.')}</tbody>`;
+  }
+
+  const optsContas = () => [...state.contas].sort((a, b) => nomeConta(a.id).localeCompare(nomeConta(b.id), 'pt-BR')).map(c => [c.id, nomeConta(c.id)]);
+
+  function validarTransf(v) {
+    if (!v.data) return ['data', 'Informe a data.'];
+    if (!state.contas.some(c => c.id === v.origem)) return ['origem', 'Escolha a conta de origem.'];
+    if (!state.contas.some(c => c.id === v.destino)) return ['destino', 'Escolha a conta de destino.'];
+    if (v.origem === v.destino) return ['destino', 'Escolha uma conta de destino diferente da origem.'];
+    if (!isFinite(v.valor) || v.valor <= 0) return ['valor', 'Informe um valor maior que zero.'];
+  }
+
+  function editarTransf(id) {
+    const t = state.transferencias.find(x => x.id === id);
+    if (!t) return;
+    modalForm('Editar transferência', [
+      { id: 'data', label: 'Data', type: 'date', value: t.data },
+      { id: 'origem', label: 'De', type: 'select', value: t.origem, options: optsContas() },
+      { id: 'destino', label: 'Para', type: 'select', value: t.destino, options: optsContas() },
+      { id: 'valor', label: 'Valor (R$)', type: 'valor', value: t.valor },
+      { id: 'descricao', label: 'Descrição', value: t.descricao },
+    ], v => {
+      const erro = validarTransf(v);
+      if (erro) return erro;
+      const antes = { ...t };
+      Object.assign(t, { data: v.data, origem: v.origem, destino: v.destino, valor: round2(v.valor), descricao: v.descricao || 'Transferência' });
+      commit(id);
+      toast('Transferência atualizada', 'success', () => { Object.assign(t, antes); commit(id); });
+    });
   }
 
   // Só uma conta por banco recebe os lançamentos automaticamente (evita contar duas vezes)
@@ -1759,6 +1859,19 @@
     else toast(`Gasto de ${brl(v)} lançado em ${cat.nome}`);
   });
 
+  $('#form-transf').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    const v = { data: fm.data.value, origem: fm.origem.value, destino: fm.destino.value, valor: parseValor(fm.valor.value) };
+    const erro = validarTransf(v);
+    if (erro) return invalido(fm[erro[0]], erro[1]);
+    const t = { id: uid(), ...v, valor: round2(v.valor), descricao: fm.descricao.value.trim() || 'Transferência' };
+    state.transferencias.push(t);
+    fm.valor.value = ''; fm.descricao.value = '';
+    commit(t.id);
+    toast(`${brl(t.valor)} transferido de ${nomeConta(t.origem)} para ${nomeConta(t.destino)}`);
+  });
+
   $('#form-conta').addEventListener('submit', e => {
     e.preventDefault();
     const fm = e.target, nome = fm.nome.value.trim().replace(/\s+/g, ' ');
@@ -1882,12 +1995,24 @@
       case 'del-div': removerComUndo('dividendos', id, 'Dividendo excluído'); break;
       case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
       case 'del-receb': removerComUndo('recebimentos', id, 'Recebimento excluído'); break;
-      case 'del-conta': removerComUndo('contas', id, 'Conta excluída'); break;
+      case 'del-transf': removerComUndo('transferencias', id, 'Transferência excluída'); break;
+      case 'del-conta': {
+        const c = state.contas.find(x => x.id === id);
+        const n = state.transferencias.filter(t => t.origem === id || t.destino === id).length;
+        if (n && !await confirmar('Excluir conta', `Excluir “${nomeConta(id)}”? ${n} ${n === 1 ? 'transferência ligada a ela também será excluída' : 'transferências ligadas a ela também serão excluídas'}.`, 'Excluir')) return;
+        const backup = { contas: [...state.contas], transferencias: [...state.transferencias] };
+        state.contas = state.contas.filter(x => x.id !== id);
+        state.transferencias = state.transferencias.filter(t => t.origem !== id && t.destino !== id);
+        commit();
+        toast(`Conta “${c.nome}” excluída`, 'success', () => { Object.assign(state, backup); commit(id); });
+        break;
+      }
       case 'nuvem': nuvem.clique(); break;
       case 'edit-fundo': modalEditarFundo(id); break;
       case 'edit-gasto': editarGasto(id); break;
       case 'edit-receb': editarReceb(id); break;
       case 'edit-conta': editarConta(id); break;
+      case 'edit-transf': editarTransf(id); break;
       case 'edit-hist': editarMov(id); break;
       case 'edit-saldo': editarSaldo(id); break;
       case 'edit-div': editarDividendo(id); break;
@@ -2052,7 +2177,10 @@
       { id: uid(), banco: 'Itaú', nome: 'Poupança', saldo: 5000, data: inicioMes, auto: false },
       { id: uid(), banco: 'Nubank', nome: 'Conta', saldo: 820.5, data: inicioMes, auto: true },
     ];
-    return { fundos, historico, saldos, dividendos, gastos, recebimentos, contas, categorias, bancos };
+    const transferencias = diaHoje >= 2 ? [
+      { id: uid(), data: `${ano}-${pad(mesAtual + 1)}-02`, origem: contas[0].id, destino: contas[1].id, valor: 500, descricao: 'Guardar na poupança' },
+    ] : [];
+    return { fundos, historico, saldos, dividendos, gastos, recebimentos, contas, transferencias, categorias, bancos };
   }
 
   // ---------- Sincronização na nuvem (Firebase) ----------
@@ -2118,7 +2246,7 @@
       if (rod) rod.lastChild.textContent = usuario ? ` Dados salvos neste navegador e sincronizados com a nuvem (${usuario.email}).` : ' Dados salvos automaticamente neste navegador.';
     }
 
-    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length && !(d.contas || []).length;
+    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length && !(d.contas || []).length && !(d.transferencias || []).length;
     const nomeDispositivo = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'celular' : 'computador';
 
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
@@ -2135,7 +2263,7 @@
       const porId = campo => { const m = new Map(); for (const x of remoto[campo] || []) m.set(x.id, x); for (const x of local[campo] || []) m.set(x.id, x); return [...m.values()]; };
       return {
         fundos: porId('fundos'), historico: porId('historico'), saldos: porId('saldos'), dividendos: porId('dividendos'),
-        gastos: porId('gastos'), recebimentos: porId('recebimentos'), contas: porId('contas'), categorias: porId('categorias'),
+        gastos: porId('gastos'), recebimentos: porId('recebimentos'), contas: porId('contas'), transferencias: porId('transferencias'), categorias: porId('categorias'),
         bancos: [...new Set([...(remoto.bancos || []), ...(local.bancos || [])])],
         config: { ...(remoto.config || {}), ...local.config, exemplo: false },
       };
@@ -2324,6 +2452,7 @@
   $('#form-saldo [name=mes]').value = mesAnterior();
   syncDataGasto();
   $('#form-conta [name=data]').value = hoje();
+  $('#form-transf [name=data]').value = hoje();
   render();
   nuvem.iniciar();
 })();
