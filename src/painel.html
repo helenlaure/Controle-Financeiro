@@ -944,9 +944,9 @@
     toast('Backup importado', 'success', () => { state = antes; commit(); });
   }
 
-  // Arquivo de lançamentos: acrescenta gastos e recebimentos sem substituir os dados atuais
+  // Arquivo de lançamentos: acrescenta gastos, recebimentos e investimentos sem substituir os dados atuais
   function adicionarLancamentos(d) {
-    if (!Array.isArray(d.gastos) && !Array.isArray(d.recebimentos)) throw new Error('formato');
+    if (!['gastos', 'recebimentos', 'fundos', 'historico'].some(k => Array.isArray(d[k]))) throw new Error('formato');
     const antes = JSON.parse(JSON.stringify(state));
     if (state.config.exemplo) {
       const cfg = state.config;
@@ -979,12 +979,31 @@
       existentesR.add(chave(r));
       novosR++;
     }
+    // Investimentos: fundo identificado por nome + banco (reaproveita o que já existe)
+    let novosF = 0, novosH = 0;
+    const mesmoBanco = nome => state.bancos.find(b => b.toLowerCase() === (nome || '').toLowerCase());
+    const acharFundo = (nome, banco) => state.fundos.find(f => f.nome.toLowerCase() === (nome || '').toLowerCase() && f.banco.toLowerCase() === (banco || '').toLowerCase());
+    for (const f of d.fundos || []) {
+      if (!f.nome || !f.banco) continue;
+      const banco = mesmoBanco(f.banco) || (state.bancos.push(f.banco), f.banco);
+      if (!acharFundo(f.nome, banco)) { state.fundos.push({ id: uid(), nome: f.nome, banco, isento: !!f.isento }); novosF++; }
+    }
+    const chaveH = h => `${h.fundoId}|${h.data}|${round2(h.valor)}`;
+    const existentesH = new Set(state.historico.map(chaveH));
+    for (const h of d.historico || []) {
+      const f = acharFundo(h.fundo, mesmoBanco(h.banco) || h.banco);
+      if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(h.data) || !isFinite(+h.valor) || !+h.valor) continue;
+      const novo = { id: uid(), fundoId: f.id, data: h.data, valor: round2(+h.valor) };
+      if (existentesH.has(chaveH(novo))) { repetidos++; continue; }
+      state.historico.push(novo); existentesH.add(chaveH(novo)); novosH++;
+    }
     sincronizarBancos(state);
     const ultima = [...(d.gastos || []), ...(d.recebimentos || [])].map(g => g.data).sort().pop();
     if (ultima) { state.config.ano = +ultima.slice(0, 4); state.config.mesGastos = +ultima.slice(5, 7); }
-    state.config.secao = novos ? 'gastos' : 'recebimentos';
+    state.config.secao = novos ? 'gastos' : novosR ? 'recebimentos' : (novosF || novosH) ? 'rendafixa' : state.config.secao;
     commit();
-    const partes = [novos && `${novos} gastos`, novosR && `${novosR} recebimentos`].filter(Boolean).join(' e ') || 'Nenhum lançamento novo';
+    const partes = [novos && `${novos} gastos`, novosR && `${novosR} recebimentos`, novosF && `${novosF} fundos`, novosH && `${novosH} aportes/resgates`]
+      .filter(Boolean).join(', ') || 'Nenhum lançamento novo';
     toast(`${partes} adicionados${repetidos ? `, ${repetidos} repetidos ignorados` : ''}`, 'success', () => { state = antes; commit(); });
   }
 
