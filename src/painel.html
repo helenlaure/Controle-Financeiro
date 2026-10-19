@@ -409,6 +409,59 @@
         </div>
       </section>
 
+      <!-- ===== AÇÕES E FIIs ===== -->
+      <section id="sec-bolsa" class="secao space-y-6 hidden">
+        <div id="bolsa-kpis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div id="bolsa-status" class="text-sm text-slate-500 dark:text-slate-400"></div>
+          <button data-action="atualizar-cotacoes" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Atualizar cotações</button>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <h2 class="font-semibold">Minha carteira</h2>
+            <span id="bolsa-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
+          </div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-bolsa"></table></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i> Registrar compra</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Se o ativo já estiver na carteira, a quantidade é somada e o preço médio recalculado.</p>
+              <form id="form-bolsa" class="grid gap-3">
+                <label class="text-sm">Ativo (ticker)
+                  <input name="ticker" required placeholder="Ex.: PETR4, MXRF11" list="lista-ativos" class="inp uppercase">
+                </label>
+                <label class="text-sm">Tipo
+                  <select name="tipo" class="inp"><option>Ação</option><option>FII</option><option>BDR</option><option>ETF</option></select>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="text-sm">Quantidade
+                    <input name="quantidade" required inputmode="decimal" placeholder="0" class="inp num">
+                  </label>
+                  <label class="text-sm">Preço pago (R$)
+                    <input name="preco" required inputmode="decimal" placeholder="0,00" class="inp num">
+                  </label>
+                </div>
+                <label class="text-sm">Corretora
+                  <select name="banco" data-opcional class="inp sel-banco"></select>
+                </label>
+                <button class="btn-primary w-full mt-1"><i data-lucide="plus" class="w-4 h-4"></i> Registrar</button>
+              </form>
+            </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-emerald-600"></i> Token da brapi</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">As cotações vêm da <a href="https://brapi.dev" target="_blank" rel="noopener" class="underline">brapi.dev</a>. O plano gratuito (sem cartão) dá 15 mil consultas por mês, com atraso de até 30 minutos. Crie sua conta, copie o token em <a href="https://brapi.dev/dashboard" target="_blank" rel="noopener" class="underline">brapi.dev/dashboard</a> e cole aqui.</p>
+              <form id="form-brapi" class="flex gap-2">
+                <input name="token" type="password" autocomplete="off" placeholder="Cole seu token" class="inp !mt-0 flex-1 min-w-0">
+                <button class="btn-primary shrink-0">Salvar</button>
+              </form>
+              <p id="brapi-token-status" class="text-[11px] text-slate-500 dark:text-slate-400 mt-2"></p>
+            </div>
+        </div>
+      </section>
+
       <!-- ===== HISTÓRICO ===== -->
       <section id="sec-historico" class="secao space-y-6 hidden">
         <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -584,6 +637,7 @@
     { id: 'recebimentos', nome: 'Recebimentos', icon: 'hand-coins', sub: 'Salário, Pix e outras entradas, mês a mês' },
     { id: 'contas', nome: 'Saldo em Conta', icon: 'wallet', sub: 'Quanto você tem hoje em cada conta' },
     { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro' },
+    { id: 'bolsa', nome: 'Ações e FIIs', icon: 'activity', sub: 'Carteira na bolsa com cotações da brapi' },
     { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo' },
     { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês' },
     { id: 'lucro', nome: 'Resumo do Lucro', icon: 'table', sub: 'Matriz mensal de lucro por fundo' },
@@ -635,7 +689,7 @@
   ];
 
   const defaults = () => ({
-    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], contas: [], transferencias: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
+    fundos: [], historico: [], saldos: [], dividendos: [], gastos: [], recebimentos: [], contas: [], transferencias: [], carteira: [], categorias: categoriasPadrao(), bancos: [...BANCOS_INICIAIS],
     config: { ano: new Date().getFullYear(), mesGastos: new Date().getMonth() + 1, mostrarNegativo: true, aliquotaIR: 15, secao: 'dashboard', exemplo: false, distPor: 'fundo' },
   });
 
@@ -646,6 +700,7 @@
     s.gastos.forEach(g => g.banco && set.add(g.banco));
     (s.recebimentos || []).forEach(r => r.banco && set.add(r.banco));
     (s.contas || []).forEach(c => c.banco && set.add(c.banco));
+    (s.carteira || []).forEach(a => a.banco && set.add(a.banco));
     s.bancos = [...set];
     return s;
   }
@@ -655,7 +710,7 @@
     const def = defaults(), arr = v => Array.isArray(v) ? v : [];
     return sincronizarBancos({
       fundos: arr(d.fundos), historico: arr(d.historico), saldos: arr(d.saldos), dividendos: arr(d.dividendos),
-      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), contas: arr(d.contas), transferencias: arr(d.transferencias), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
+      gastos: arr(d.gastos), recebimentos: arr(d.recebimentos), contas: arr(d.contas), transferencias: arr(d.transferencias), carteira: arr(d.carteira), categorias: Array.isArray(d.categorias) ? d.categorias : def.categorias,
       bancos: Array.isArray(d.bancos) ? d.bancos : def.bancos,
       config: { ...def.config, ...(d.config || {}) },
     });
@@ -678,8 +733,8 @@
   function dadosNuvem(s = state) {
     return {
       fundos: s.fundos, historico: s.historico, saldos: s.saldos, dividendos: s.dividendos,
-      gastos: s.gastos, recebimentos: s.recebimentos, contas: s.contas, transferencias: s.transferencias, categorias: s.categorias, bancos: s.bancos,
-      config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo },
+      gastos: s.gastos, recebimentos: s.recebimentos, contas: s.contas, transferencias: s.transferencias, carteira: s.carteira, categorias: s.categorias, bancos: s.bancos,
+      config: { mostrarNegativo: s.config.mostrarNegativo, aliquotaIR: s.config.aliquotaIR, exemplo: s.config.exemplo, brapiToken: s.config.brapiToken || '' },
     };
   }
   let ultimaImpressao = JSON.stringify(dadosNuvem());
@@ -908,10 +963,11 @@
   function modalRenomearBanco(nomeAtual) {
     const nF = state.fundos.filter(f => f.banco === nomeAtual).length, nG = state.gastos.filter(g => g.banco === nomeAtual).length;
     const nR = state.recebimentos.filter(r => r.banco === nomeAtual).length, nC = state.contas.filter(c => c.banco === nomeAtual).length;
+    const nA = state.carteira.filter(a => a.banco === nomeAtual).length;
     abrirModal('Renomear banco', `
       <form class="grid gap-3 text-slate-800 dark:text-slate-100">
         <label class="text-sm">Novo nome <input id="m-nome" required list="lista-bancos" value="${esc(nomeAtual)}" class="inp"></label>
-        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s), ${nG} gasto(s) , ${nR} recebimento(s) e ${nC} conta(s) vinculados.</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">O novo nome será aplicado a ${nF} fundo(s), ${nG} gasto(s), ${nR} recebimento(s), ${nC} conta(s) e ${nA} ativo(s) da bolsa vinculados.</p>
       </form>`, [
       { label: 'Cancelar', cls: btnSec, cancelar: true },
       { label: 'Salvar', cls: 'btn-primary', onClick: () => {
@@ -921,12 +977,13 @@
         if (state.bancos.some(b => b !== nomeAtual && b.toLowerCase() === novo.toLowerCase())) {
           invalido($('#m-nome'), 'Já existe um banco com esse nome.'); return true;
         }
-        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos, recebimentos: state.recebimentos, contas: state.contas }));
+        const antes = JSON.parse(JSON.stringify({ bancos: state.bancos, fundos: state.fundos, gastos: state.gastos, recebimentos: state.recebimentos, contas: state.contas, carteira: state.carteira }));
         state.bancos = state.bancos.map(b => b === nomeAtual ? novo : b);
         state.fundos.forEach(f => { if (f.banco === nomeAtual) f.banco = novo; });
         state.gastos.forEach(g => { if (g.banco === nomeAtual) g.banco = novo; });
         state.recebimentos.forEach(r => { if (r.banco === nomeAtual) r.banco = novo; });
         state.contas.forEach(c => { if (c.banco === nomeAtual) c.banco = novo; });
+        state.carteira.forEach(a => { if (a.banco === nomeAtual) a.banco = novo; });
         commit(novo);
         toast(`“${nomeAtual}” renomeado para “${novo}”`, 'success', () => { Object.assign(state, antes); commit(nomeAtual); });
       } },
@@ -1141,9 +1198,11 @@
     }
     const div = state.dividendos.reduce((s, d) => s + d.valor, 0);
     const lucroRF = pat - inv;
-    const bruto = lucroRF + div;
+    const cart = resumoCarteira();
+    const bruto = lucroRF + cart.resultado + div;
     const liquido = bruto - ir;
-    return { inv, pat, ir, div, lucroRF, bruto, liquido, rent: inv > 0 ? bruto / inv : 0, rentLiq: inv > 0 ? liquido / inv : 0 };
+    const invTotal = inv + cart.custo;
+    return { inv, pat, ir, div, lucroRF, cart, invTotal, bruto, liquido, rent: invTotal > 0 ? bruto / invTotal : 0, rentLiq: invTotal > 0 ? liquido / invTotal : 0 };
   }
 
   function anosDisponiveis() {
@@ -1172,6 +1231,7 @@
     renderRecebimentos();
     renderContas();
     renderTransferencias();
+    renderBolsa();
     $$('.ano-label').forEach(e => e.textContent = state.config.ano);
     $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
     $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
@@ -1246,7 +1306,7 @@
     });
     const cadastrados = new Set(state.bancos.map(b => b.toLowerCase()));
     $('#lista-bancos').innerHTML = BANCOS_SUGERIDOS.filter(b => !cadastrados.has(b.toLowerCase())).map(b => `<option value="${esc(b)}">`).join('');
-    $('#lista-ativos').innerHTML = [...new Set(state.dividendos.map(d => d.ativo))].map(b => `<option value="${esc(b)}">`).join('');
+    $('#lista-ativos').innerHTML = [...new Set([...state.carteira.map(a => a.ticker), ...state.dividendos.map(d => d.ativo)])].map(b => `<option value="${esc(b)}">`).join('');
   }
 
   function updateHintBanco() {
@@ -1267,7 +1327,7 @@
 
   // Aviso no topo: dados de exemplo (em todas as seções) ou boas-vindas (só no Dashboard, com o painel vazio)
   function renderBanner() {
-    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length && !state.recebimentos.length && !state.contas.length;
+    const vazio = !state.fundos.length && !state.dividendos.length && !state.gastos.length && !state.recebimentos.length && !state.contas.length && !state.carteira.length;
     $('#empty-banner').innerHTML = state.config.exemplo && !vazio ? `
       <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div class="flex gap-3"><i data-lucide="flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"></i>
@@ -1293,9 +1353,11 @@
     const ym = mesGastosKey(), gMes = totalGastos(ym), lim = totalLimites(), rMes = totalReceb(ym), sobra = rMes - gMes;
     const nomeMes = `${MESES_FULL[state.config.mesGastos - 1]} ${state.config.ano}`;
     $('#cards').innerHTML = [
-      card('Patrimônio Total', brl(r.pat + emConta), 'wallet', state.contas.length ? `Investimentos ${brl(r.pat)} + contas ${brl(emConta)}` : 'Valor atual das aplicações'),
-      card('Total Investido', brl(r.inv), 'piggy-bank', 'Aportes − resgates'),
-      card('Lucro Bruto', brl(r.bruto), 'trending-up', `RF ${brl(r.lucroRF)} + dividendos`, tone(r.bruto)),
+      card('Patrimônio Total', brl(r.pat + r.cart.atual + emConta), 'wallet', [
+        state.carteira.length || state.contas.length ? `Renda fixa ${brl(r.pat)}` : 'Valor atual das aplicações',
+        state.carteira.length && `bolsa ${brl(r.cart.atual)}`, state.contas.length && `contas ${brl(emConta)}`].filter(Boolean).join(' + ')),
+      card('Total Investido', brl(r.invTotal), 'piggy-bank', state.carteira.length ? `Renda fixa ${brl(r.inv)} + bolsa ${brl(r.cart.custo)}` : 'Aportes − resgates'),
+      card('Lucro Bruto', brl(r.bruto), 'trending-up', `RF ${brl(r.lucroRF)}${state.carteira.length ? ` + bolsa ${brl(r.cart.resultado)}` : ''} + dividendos`, tone(r.bruto)),
       card('Lucro Líquido', brl(r.liquido), 'badge-dollar-sign', `IR estimado: ${brl(r.ir)} (${num(+state.config.aliquotaIR)}%)`, tone(r.liquido)),
       card('Dividendos Recebidos', brl(r.div), 'coins', `Em ${state.config.ano}: ${brl(div)}`),
       card('Rentabilidade Geral', `${sign(r.rent)}${pct(r.rent)}`, 'percent', `Líquida: ${sign(r.rentLiq)}${pct(r.rentLiq)}`, tone(r.rent)),
@@ -1305,7 +1367,7 @@
     ].join('');
 
     renderChart();
-    renderDistribuicao(r.pat);
+    renderDistribuicao(r.pat + r.cart.atual);
 
     // Painel compacto de orçamento
     $('#dash-mes-label').textContent = nomeMes;
@@ -1359,6 +1421,135 @@
       <tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="2">Total</td>
         <td class="td text-right num ${t.conta < 0 ? 'text-rose-600 dark:text-rose-400' : ''}">${brl(t.conta)}</td><td class="td text-right num">${brl(t.inv)}</td><td class="td text-right num">${brl(t.atual)}</td><td class="td text-right num ${tone(t.lucro)}">${brl(t.lucro)}</td>
         <td class="td text-right num">${brl(t.rMes)}</td><td class="td text-right num">${brl(t.gMes)}</td><td class="td text-right num">${brl(t.gAno)}</td><td class="td"></td></tr></tfoot>`;
+  }
+
+  // ---------- Ações e FIIs (cotações da brapi) ----------
+  // Cache local das cotações: o plano gratuito atualiza a cada 30 min e consulta 1 ativo por vez
+  const COT_KEY = 'controle-gastos-investimentos-cotacoes';
+  const COT_VALIDADE = 30 * 60 * 1000;
+  let cotacoes = {};
+  try { cotacoes = JSON.parse(localStorage.getItem(COT_KEY) || '{}'); } catch (e) {}
+  const salvarCot = () => { try { localStorage.setItem(COT_KEY, JSON.stringify(cotacoes)); } catch (e) {} };
+  let buscandoCot = false, erroCot = '';
+  const cotacao = t => cotacoes[t] && !cotacoes[t].erro ? cotacoes[t] : null;
+  const precoAtual = a => cotacao(a.ticker)?.preco ?? a.precoMedio;
+
+  function resumoCarteira() {
+    let custo = 0, atual = 0, dia = 0;
+    for (const a of state.carteira) {
+      const c = cotacao(a.ticker);
+      custo += a.quantidade * a.precoMedio;
+      atual += a.quantidade * (c?.preco ?? a.precoMedio);
+      if (c) dia += a.quantidade * (c.variacao || 0);
+    }
+    return { custo, atual, resultado: atual - custo, dia };
+  }
+
+  async function buscarCotacoes(forcar = false) {
+    if (buscandoCot) return;
+    const tickers = [...new Set(state.carteira.map(a => a.ticker))];
+    const pendentes = tickers.filter(t => forcar || !cotacoes[t] || Date.now() - (cotacoes[t].em || 0) > COT_VALIDADE);
+    if (!pendentes.length) return;
+    buscandoCot = true; erroCot = ''; renderBolsa();
+    const token = (state.config.brapiToken || '').trim();
+    const buscar = window.__brapiFetch || fetch.bind(window);
+    for (const t of pendentes) {
+      try {
+        const r = await buscar(`https://brapi.dev/api/quote/${encodeURIComponent(t)}`, token ? { headers: { Authorization: 'Bearer ' + token } } : {});
+        const j = await r.json().catch(() => ({}));
+        const q = j.results?.[0];
+        if (r.ok && q && q.regularMarketPrice != null) {
+          cotacoes[t] = { preco: q.regularMarketPrice, variacao: q.regularMarketChange || 0, variacaoPct: q.regularMarketChangePercent || 0,
+            hora: q.regularMarketTime || null, nome: q.longName || q.shortName || t, logo: q.logourl || '', em: Date.now() };
+        } else if (j.code === 'MISSING_TOKEN') {
+          erroCot = 'Sem token, a brapi só libera PETR4, VALE3, MGLU3 e ITUB4. Cadastre seu token gratuito no quadro "Token da brapi".';
+          cotacoes[t] = { erro: 'precisa de token', em: Date.now() };
+        } else if (j.code === 'INVALID_TOKEN') { erroCot = 'A brapi recusou o token. Confira se ele foi copiado inteiro e salve de novo.'; break; }
+        else if (r.status === 429) { erroCot = 'O limite de consultas da brapi foi atingido. As cotações voltam a atualizar mais tarde.'; break; }
+        else if (r.status === 404 || (r.ok && !q)) cotacoes[t] = { erro: 'não encontrado na brapi', em: Date.now() };
+        else erroCot = j.message || `A brapi respondeu com erro ${r.status}.`;
+      } catch (e) { erroCot = 'Não foi possível falar com a brapi agora (sem internet?). As cotações abaixo podem estar antigas.'; break; }
+    }
+    salvarCot();
+    buscandoCot = false;
+    render();
+  }
+
+  function renderBolsa() {
+    const c = resumoCarteira();
+    const tile = (titulo, valor, sub, cls = '') => `<div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+      <div class="text-sm font-medium text-slate-500 dark:text-slate-400">${titulo}</div>
+      <div class="text-2xl font-semibold num tracking-tight mt-2 ${cls}">${valor}</div>
+      <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">${sub}</div></div>`;
+    const pctRes = c.custo > 0 ? c.resultado / c.custo : 0, base = c.atual - c.dia, pctDia = base > 0 ? c.dia / base : 0;
+    $('#bolsa-kpis').innerHTML = [
+      tile('Valor da carteira', brl(c.atual), `${state.carteira.length} ${state.carteira.length === 1 ? 'ativo' : 'ativos'}`),
+      tile('Total investido', brl(c.custo), 'Quantidade × preço médio'),
+      tile('Resultado', `${sign(c.resultado)}${brl(c.resultado)}`, `${sign(pctRes)}${pct(pctRes)} sobre o investido`, tone(c.resultado)),
+      tile('Variação de hoje', `${sign(c.dia)}${brl(c.dia)}`, `${sign(pctDia)}${pct(pctDia)} no dia`, tone(c.dia)),
+    ].join('');
+
+    const ems = state.carteira.map(a => cotacao(a.ticker)?.em).filter(Boolean);
+    const quando = ems.length ? new Date(Math.min(...ems)).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : null;
+    $('#bolsa-status').innerHTML = buscandoCot ? '<span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="w-4 h-4 animate-spin"></i> Atualizando cotações…</span>'
+      : erroCot ? `<span class="text-rose-600 dark:text-rose-400">${esc(erroCot)}</span>`
+      : !state.carteira.length ? 'Registre uma compra para acompanhar a cotação.'
+      : quando ? `Cotações consultadas em ${quando}. No plano gratuito da brapi os preços têm atraso de até 30 minutos.` : 'Sem cotações ainda.';
+
+    const divPor = t => state.dividendos.filter(d => d.ativo === t).reduce((s, d) => s + d.valor, 0);
+    const lista = [...state.carteira].sort((a, b) => b.quantidade * precoAtual(b) - a.quantidade * precoAtual(a));
+    $('#bolsa-count').textContent = `${lista.length} ${lista.length === 1 ? 'ativo' : 'ativos'}`;
+    let tDiv = 0;
+    $('#tbl-bolsa').innerHTML = `<thead><tr><th class="th">Ativo</th><th class="th text-right">Qtd. · preço médio</th><th class="th text-right">Cotação</th>
+      <th class="th text-right">Valor atual</th><th class="th text-right">Resultado</th><th class="th text-right">Dividendos</th><th class="th"></th></tr></thead>
+      <tbody>${lista.map(a => {
+        const q = cotacao(a.ticker), info = cotacoes[a.ticker];
+        const atual = a.quantidade * precoAtual(a), custo = a.quantidade * a.precoMedio, res = atual - custo, dv = divPor(a.ticker);
+        tDiv += dv;
+        return `<tr class="${a.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="td"><div class="flex items-center gap-2.5">
+            ${q?.logo ? `<img src="${esc(q.logo)}" alt="" class="h-7 w-7 rounded-md bg-white shrink-0" loading="lazy">` : `<span class="h-7 w-7 rounded-md bg-slate-100 dark:bg-slate-800 grid place-items-center text-[10px] font-semibold text-slate-500 shrink-0">${esc(a.ticker.slice(0, 2))}</span>`}
+            <div class="min-w-0"><div class="font-semibold">${esc(a.ticker)} <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5">${esc(a.tipo)}</span></div>
+              <div class="text-[11px] text-slate-400 truncate max-w-[150px]">${esc(q?.nome && q.nome !== a.ticker ? q.nome : (a.banco || ''))}</div></div></div></td>
+          <td class="td text-right"><div class="num">${a.quantidade.toLocaleString('pt-BR')}</div><div class="text-[11px] text-slate-400 num">PM ${brl(a.precoMedio)}</div></td>
+          <td class="td text-right">${q ? `<div class="num font-medium">${brl(q.preco)}</div><div class="text-[11px] num ${tone(q.variacaoPct)}">${sign(q.variacaoPct)}${num(q.variacaoPct)}% hoje</div>`
+            : `<span class="text-[11px] text-amber-600 dark:text-amber-400">${esc(info?.erro || (buscandoCot ? 'buscando…' : 'sem cotação'))}</span>`}</td>
+          <td class="td text-right num font-medium">${brl(atual)}</td>
+          <td class="td text-right"><div class="num font-medium ${tone(res)}">${sign(res)}${brl(res)}</div><div class="text-[11px] num ${tone(res)}">${custo > 0 ? sign(res) + pct(res / custo) : ''}</div></td>
+          <td class="td text-right num ${dv ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}">${dv ? brl(dv) : '—'}</td>
+          <td class="td text-right"><button class="btn-edit" data-action="edit-ativo" data-id="${a.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-ativo" data-id="${a.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
+      }).join('') || emptyRow(7, 'Nenhum ativo ainda. Registre sua primeira compra ao lado.')}</tbody>
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="3">Total</td><td class="td text-right num">${brl(c.atual)}</td>
+        <td class="td text-right num ${tone(c.resultado)}">${sign(c.resultado)}${brl(c.resultado)}</td><td class="td text-right num text-emerald-600 dark:text-emerald-400">${tDiv ? brl(tDiv) : '—'}</td><td class="td"></td></tr></tfoot>` : ''}`;
+
+    const tk = (state.config.brapiToken || '').trim();
+    const inp = $('#form-brapi [name=token]');
+    if (document.activeElement !== inp) inp.value = tk;
+    $('#brapi-token-status').textContent = tk ? `Token salvo (termina em …${tk.slice(-4)}). Ele vai junto na sincronização entre seus aparelhos.`
+      : 'Sem token: só PETR4, VALE3, MGLU3 e ITUB4 têm cotação.';
+  }
+
+  function editarAtivo(id) {
+    const a = state.carteira.find(x => x.id === id);
+    if (!a) return;
+    modalForm('Editar ativo', [
+      { id: 'ticker', label: 'Ativo (ticker)', value: a.ticker, list: 'lista-ativos' },
+      { id: 'tipo', label: 'Tipo', type: 'select', value: a.tipo, options: ['Ação', 'FII', 'BDR', 'ETF'].map(t => [t, t]) },
+      { id: 'quantidade', label: 'Quantidade', type: 'valor', value: a.quantidade },
+      { id: 'preco', label: 'Preço médio (R$)', type: 'valor', value: a.precoMedio },
+      { id: 'banco', label: 'Corretora', type: 'select', value: a.banco || '', options: [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b])] },
+    ], v => {
+      const ticker = v.ticker.toUpperCase().replace(/\s+/g, '');
+      if (!ticker) return ['ticker', 'Informe o ticker.'];
+      if (state.carteira.some(x => x.id !== id && x.ticker === ticker)) return ['ticker', 'Esse ativo já está na carteira. Edite a linha dele.'];
+      if (valorInvalido(v.quantidade)) return ['quantidade', 'Informe uma quantidade maior que zero.'];
+      if (valorInvalido(v.preco)) return ['preco', 'Informe um preço maior que zero.'];
+      const antes = { ...a };
+      Object.assign(a, { ticker, tipo: v.tipo, quantidade: v.quantidade, precoMedio: round2(v.preco), banco: v.banco });
+      commit(id);
+      toast(`${ticker} atualizado`, 'success', () => { Object.assign(a, antes); commit(id); });
+      if (ticker !== antes.ticker) buscarCotacoes();
+    });
   }
 
   // ---------- Saldo em conta ----------
@@ -1692,11 +1883,14 @@
     $('#dist-sub').textContent = porBanco ? 'Valor atual por banco/corretora' : 'Valor atual por fundo/conta';
     let itens;
     if (porBanco) {
-      const m = new Map();
-      for (const f of state.fundos) m.set(f.banco, (m.get(f.banco) || 0) + rendido(f.id));
-      itens = [...m].map(([b, v]) => ({ nome: b, det: `${state.fundos.filter(f => f.banco === b).length} fundo(s)`, v }));
+      const m = new Map(), n = new Map();
+      const add = (b, v) => { m.set(b, (m.get(b) || 0) + v); n.set(b, (n.get(b) || 0) + 1); };
+      for (const f of state.fundos) add(f.banco, rendido(f.id));
+      for (const a of state.carteira) add(a.banco || 'Sem corretora', a.quantidade * precoAtual(a));
+      itens = [...m].map(([b, v]) => ({ nome: b, det: `${n.get(b)} ${n.get(b) === 1 ? 'investimento' : 'investimentos'}`, v }));
     } else {
-      itens = state.fundos.map(f => ({ nome: f.nome, det: f.banco, v: rendido(f.id) }));
+      itens = [...state.fundos.map(f => ({ nome: f.nome, det: f.banco, v: rendido(f.id) })),
+        ...state.carteira.map(a => ({ nome: a.ticker, det: a.tipo + (a.banco ? ' · ' + a.banco : ''), v: a.quantidade * precoAtual(a) }))];
     }
     itens = itens.filter(x => x.v > EPS).sort((a, b) => b.v - a.v);
     $('#distribuicao').innerHTML = itens.length ? itens.map(({ nome, det, v }) => {
@@ -1905,6 +2099,51 @@
     else toast(`Gasto de ${brl(v)} lançado em ${cat.nome}`);
   });
 
+  $('#form-bolsa').addEventListener('submit', e => {
+    e.preventDefault();
+    const fm = e.target;
+    const ticker = fm.ticker.value.toUpperCase().replace(/\s+/g, '');
+    if (!ticker) return invalido(fm.ticker, 'Informe o ticker do ativo.');
+    const qtd = parseValor(fm.quantidade.value), preco = parseValor(fm.preco.value);
+    if (!isFinite(qtd) || qtd <= 0) return invalido(fm.quantidade, 'Informe uma quantidade maior que zero.');
+    if (!isFinite(preco) || preco <= 0) return invalido(fm.preco, 'Informe o preço pago por ação ou cota.');
+    let a = state.carteira.find(x => x.ticker === ticker), msg;
+    if (a) {
+      const q = a.quantidade + qtd;
+      a.precoMedio = round2((a.quantidade * a.precoMedio + qtd * preco) / q);
+      a.quantidade = q;
+      if (fm.banco.value) a.banco = fm.banco.value;
+      msg = `${ticker}: agora ${q.toLocaleString('pt-BR')} com preço médio ${brl(a.precoMedio)}`;
+    } else {
+      a = { id: uid(), ticker, tipo: fm.tipo.value, quantidade: qtd, precoMedio: round2(preco), banco: fm.banco.value };
+      state.carteira.push(a);
+      msg = `${ticker} adicionado à carteira`;
+    }
+    fm.ticker.value = ''; fm.quantidade.value = ''; fm.preco.value = '';
+    commit(a.id);
+    toast(msg);
+    buscarCotacoes();
+  });
+  $('#form-bolsa [name=ticker]').addEventListener('change', e => {
+    const t = e.target.value.toUpperCase().trim();
+    const tipo = state.carteira.find(a => a.ticker === t)?.tipo || state.dividendos.find(d => d.ativo === t)?.tipo || (/11$/.test(t) ? 'FII' : '');
+    if (tipo) $('#form-bolsa [name=tipo]').value = tipo;
+  });
+
+  $('#form-brapi').addEventListener('submit', e => {
+    e.preventDefault();
+    state.config.brapiToken = e.target.token.value.trim();
+    for (const t of Object.keys(cotacoes)) if (cotacoes[t].erro) delete cotacoes[t];
+    erroCot = '';
+    save(); render();
+    toast(state.config.brapiToken ? 'Token da brapi salvo. Atualizando cotações…' : 'Token removido', 'info');
+    buscarCotacoes(true);
+  });
+
+  // Mantém as cotações em dia enquanto a página estiver aberta
+  setInterval(() => buscarCotacoes(), COT_VALIDADE);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') buscarCotacoes(); });
+
   $('#form-transf').addEventListener('submit', e => {
     e.preventDefault();
     const fm = e.target;
@@ -2046,6 +2285,7 @@
     const sec = e.target.closest('[data-secao]');
     if (sec) {
       state.config.secao = sec.dataset.secao; save(); renderNav(); renderBanner(); lucide.createIcons();
+      if (sec.dataset.secao === 'bolsa') buscarCotacoes();
       const el = $('#sec-' + sec.dataset.secao); el.classList.remove('section-enter'); void el.offsetWidth; el.classList.add('section-enter');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -2060,6 +2300,10 @@
       case 'del-gasto': removerComUndo('gastos', id, 'Gasto excluído'); break;
       case 'del-receb': removerComUndo('recebimentos', id, 'Recebimento excluído'); break;
       case 'del-transf': removerComUndo('transferencias', id, 'Transferência excluída'); break;
+      case 'del-ativo': removerComUndo('carteira', id, 'Ativo removido da carteira'); break;
+      case 'atualizar-cotacoes':
+        if (!state.carteira.length) return toast('Registre uma compra primeiro.', 'info');
+        buscarCotacoes(true); break;
       case 'del-conta': {
         const c = state.contas.find(x => x.id === id);
         const n = state.transferencias.filter(t => t.origem === id || t.destino === id).length;
@@ -2081,15 +2325,17 @@
       case 'edit-receb': editarReceb(id); break;
       case 'edit-conta': editarConta(id); break;
       case 'edit-transf': editarTransf(id); break;
+      case 'edit-ativo': editarAtivo(id); break;
       case 'edit-hist': editarMov(id); break;
       case 'edit-saldo': editarSaldo(id); break;
       case 'edit-div': editarDividendo(id); break;
       case 'edit-banco': modalRenomearBanco(id); break;
-      case 'dist': state.config.distPor = btn.dataset.por; save(); renderDistribuicao(resumo().pat); break;
+      case 'dist': { state.config.distPor = btn.dataset.por; save(); const rr = resumo(); renderDistribuicao(rr.pat + rr.cart.atual); break; }
       case 'del-banco': {
         const nF = state.fundos.filter(f => f.banco === id).length, nG = state.gastos.filter(g => g.banco === id).length;
         const nR = state.recebimentos.filter(r => r.banco === id).length, nC = state.contas.filter(c => c.banco === id).length;
-        if (nF || nG || nR || nC) return toast(`“${id}” está em uso por ${nF} fundo(s), ${nG} gasto(s), ${nR} recebimento(s) e ${nC} conta(s). Altere esses registros antes.`, 'error');
+        const nA = state.carteira.filter(a => a.banco === id).length;
+        if (nF || nG || nR || nC || nA) return toast(`“${id}” está em uso por ${nF} fundo(s), ${nG} gasto(s), ${nR} recebimento(s), ${nC} conta(s) e ${nA} ativo(s) da bolsa. Altere esses registros antes.`, 'error');
         const idx = state.bancos.indexOf(id);
         state.bancos.splice(idx, 1);
         commit();
@@ -2248,7 +2494,12 @@
     const transferencias = diaHoje >= 2 ? [
       { id: uid(), data: `${ano}-${pad(mesAtual + 1)}-02`, origem: contas[0].id, destino: contas[1].id, valor: 500, descricao: 'Guardar na poupança' },
     ] : [];
-    return { fundos, historico, saldos, dividendos, gastos, recebimentos, contas, transferencias, categorias, bancos };
+    const carteira = [
+      { id: uid(), ticker: 'PETR4', tipo: 'Ação', quantidade: 100, precoMedio: 38.5, banco: 'XP Investimentos' },
+      { id: uid(), ticker: 'ITUB4', tipo: 'Ação', quantidade: 200, precoMedio: 31.2, banco: 'XP Investimentos' },
+      { id: uid(), ticker: 'VALE3', tipo: 'Ação', quantidade: 50, precoMedio: 62, banco: 'XP Investimentos' },
+    ];
+    return { fundos, historico, saldos, dividendos, gastos, recebimentos, contas, transferencias, carteira, categorias, bancos };
   }
 
   // ---------- Sincronização na nuvem (Firebase) ----------
@@ -2314,7 +2565,7 @@
       if (rod) rod.lastChild.textContent = usuario ? ` Dados salvos neste navegador e sincronizados com a nuvem (${usuario.email}).` : ' Dados salvos automaticamente neste navegador.';
     }
 
-    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length && !(d.contas || []).length && !(d.transferencias || []).length;
+    const vazio = d => !d.fundos.length && !d.historico.length && !d.saldos.length && !d.dividendos.length && !d.gastos.length && !(d.recebimentos || []).length && !(d.contas || []).length && !(d.transferencias || []).length && !(d.carteira || []).length;
     const nomeDispositivo = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'celular' : 'computador';
 
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
@@ -2331,7 +2582,7 @@
       const porId = campo => { const m = new Map(); for (const x of remoto[campo] || []) m.set(x.id, x); for (const x of local[campo] || []) m.set(x.id, x); return [...m.values()]; };
       return {
         fundos: porId('fundos'), historico: porId('historico'), saldos: porId('saldos'), dividendos: porId('dividendos'),
-        gastos: porId('gastos'), recebimentos: porId('recebimentos'), contas: porId('contas'), transferencias: porId('transferencias'), categorias: porId('categorias'),
+        gastos: porId('gastos'), recebimentos: porId('recebimentos'), contas: porId('contas'), transferencias: porId('transferencias'), carteira: porId('carteira'), categorias: porId('categorias'),
         bancos: [...new Set([...(remoto.bancos || []), ...(local.bancos || [])])],
         config: { ...(remoto.config || {}), ...local.config, exemplo: false },
       };
@@ -2523,6 +2774,7 @@
   $('#form-transf [name=data]').value = hoje();
   render();
   nuvem.iniciar();
+  buscarCotacoes();
 })();
 </script>
 </body>
