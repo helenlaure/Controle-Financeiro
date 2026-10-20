@@ -1254,19 +1254,19 @@
   const cartaoById = id => state.cartoes.find(c => c.id === id);
   const ultimoDia = (y, m) => new Date(y, m, 0).getDate();
   function addMes(ym, k) { let [y, m] = ym.split('-').map(Number); m += k; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return `${y}-${pad(m)}`; }
-  // Mês da fatura = mês do vencimento. Compra no dia do fechamento (ou depois) vai para a fatura seguinte.
+  // Mês da fatura = mês do FECHAMENTO (a fatura que fecha em outubro é a "fatura de outubro",
+  // mesmo que vença em novembro). Compra no dia do fechamento ou depois vai para a fatura seguinte.
   function faturaDaCompra(c, data) {
     const [y, m, d] = data.split('-').map(Number);
-    let ym = `${y}-${pad(m)}`;
-    if (d >= Math.min(c.fecha, ultimoDia(y, m))) ym = addMes(ym, 1);
-    return +c.vence > +c.fecha ? ym : addMes(ym, 1);
+    const ym = `${y}-${pad(m)}`;
+    return d >= Math.min(c.fecha, ultimoDia(y, m)) ? addMes(ym, 1) : ym;
   }
   window.__faturaDaCompra = faturaDaCompra;
   function datasFatura(c, ym) {
     const [y, m] = ym.split('-').map(Number);
-    const fymes = +c.vence > +c.fecha ? ym : addMes(ym, -1);
-    const [fy, fm] = fymes.split('-').map(Number);
-    return { fechamento: `${fymes}-${pad(Math.min(c.fecha, ultimoDia(fy, fm)))}`, vencimento: `${ym}-${pad(Math.min(c.vence, ultimoDia(y, m)))}` };
+    const vmes = +c.vence > +c.fecha ? ym : addMes(ym, 1);
+    const [vy, vm] = vmes.split('-').map(Number);
+    return { fechamento: `${ym}-${pad(Math.min(c.fecha, ultimoDia(y, m)))}`, vencimento: `${vmes}-${pad(Math.min(c.vence, ultimoDia(vy, vm)))}` };
   }
   // Parcelas de uma compra no cartão: cada uma cai numa fatura seguida; a última leva o arredondamento
   function parcelasDe(g) {
