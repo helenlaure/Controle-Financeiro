@@ -963,7 +963,7 @@
   const valorInvalido = v => !isFinite(v) || v <= 0;
 
   const optsPago = () => [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b]),
-    ...state.cartoes.map(c => ['card:' + c.id, `💳 Cartão ${c.nome}`])];
+    ...state.cartoes.map(c => ['card:' + c.id, `Cartão ${c.nome}`])];
 
   function editarGasto(id) {
     const g = state.gastos.find(x => x.id === id);
@@ -1507,7 +1507,7 @@
       const v = sel.value;
       sel.innerHTML = '<option value="">Não informado</option>' +
         `<optgroup label="Conta / débito / Pix">${bancosOrdenados().map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('')}</optgroup>` +
-        (state.cartoes.length ? `<optgroup label="Cartão de crédito">${state.cartoes.map(c => `<option value="card:${c.id}">💳 ${esc(c.nome)}</option>`).join('')}</optgroup>` : '');
+        (state.cartoes.length ? `<optgroup label="Cartão de crédito">${state.cartoes.map(c => `<option value="card:${c.id}">Cartão ${esc(c.nome)}</option>`).join('')}</optgroup>` : '');
       if ([...sel.options].some(o => o.value === v)) sel.value = v;
       $('#form-gasto [data-campo-parcelas]').classList.toggle('hidden', !sel.value.startsWith('card:'));
     });
@@ -2277,7 +2277,7 @@
 
     // Gastos do mês por banco
     const porBanco = new Map();
-    for (const g of lista) { const k = g.cartaoId && cartaoById(g.cartaoId) ? '💳 ' + cartaoById(g.cartaoId).nome : (g.banco || ''); porBanco.set(k, (porBanco.get(k) || 0) + g.valor); }
+    for (const g of lista) { const k = g.cartaoId && cartaoById(g.cartaoId) ? 'Cartão ' + cartaoById(g.cartaoId).nome : (g.banco || ''); porBanco.set(k, (porBanco.get(k) || 0) + g.valor); }
     const bl = [...porBanco].sort((a, b) => b[1] - a[1]);
     $('#gastos-por-banco').innerHTML = bl.length ? bl.map(([b, v]) => {
       const p = totalLista > 0 ? v / totalLista : 0;
