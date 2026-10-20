@@ -65,7 +65,7 @@
         <div class="text-xs text-slate-500 dark:text-slate-400">Gastos &amp; Investimentos</div>
       </div>
     </div>
-    <nav id="nav-desktop" class="flex-1 p-3 space-y-1"></nav>
+    <nav id="nav-desktop" class="flex-1 p-3 space-y-1 overflow-y-auto scroll-thin"></nav>
     <div class="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
       <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Alíquota de IR estimada (%)
         <input id="cfg-ir" type="text" inputmode="decimal" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -155,7 +155,8 @@
           <div id="gastos-kpis" class="flex flex-wrap gap-x-6 gap-y-1 text-sm"></div>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div data-abas="gastos" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
+        <div data-aba="orcamento" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
               <h2 class="font-semibold">Orçamento por categoria</h2>
@@ -203,7 +204,7 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-aba="lancamentos" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <h2 class="font-semibold">Gastos de <span id="gastos-mes-label"></span></h2>
             <span id="gastos-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
@@ -211,7 +212,7 @@
           <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-gastos"></table></div>
         </div>
 
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-aba="ano" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 class="font-semibold">Gastos por categoria — <span class="ano-label"></span></h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">Valores em vermelho ultrapassaram o limite mensal da categoria.</p>
@@ -231,7 +232,8 @@
           <div id="receb-kpis" class="flex flex-wrap gap-x-6 gap-y-1 text-sm"></div>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div data-abas="recebimentos" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
+        <div data-aba="lancamentos" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h2 class="font-semibold">Recebimentos de <span id="receb-mes-label"></span></h2>
@@ -270,7 +272,7 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-aba="ano" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 class="font-semibold">Entradas e saídas — <span class="ano-label"></span></h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">Recebimentos por tipo, mês a mês, comparados com os gastos. Sobra = recebido − gasto.</p>
@@ -311,7 +313,8 @@
           <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md">Informe o saldo de cada conta numa data. Com a atualização automática ligada, o painel soma os recebimentos e desconta os gastos lançados nesse banco depois dessa data. Quando conferir o saldo no app do banco, é só atualizar aqui.</p>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div data-abas="contas" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
+        <div data-aba="contas" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h2 class="font-semibold">Contas</h2>
@@ -346,7 +349,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div data-aba="transferencias" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 xl:self-start min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
@@ -419,7 +422,8 @@
           <button data-action="atualizar-cotacoes" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Atualizar cotações</button>
         </div>
 
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-abas="bolsa" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
+        <div data-aba="carteira" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <h2 class="font-semibold">Minha carteira</h2>
             <span id="bolsa-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
@@ -427,7 +431,7 @@
           <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-bolsa"></table></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div data-aba="registrar" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
               <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i> Registrar compra</h2>
               <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Se o ativo já estiver na carteira, a quantidade é somada e o preço médio recalculado.</p>
@@ -557,7 +561,8 @@
 
       <!-- ===== DIVIDENDOS ===== -->
       <section id="sec-dividendos" class="secao space-y-6 hidden">
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+        <div data-abas="dividendos" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
+        <div data-aba="lancamentos" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
           <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="coins" class="w-4 h-4 text-emerald-600"></i> Lançar dividendo / rendimento</h2>
           <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">FIIs, ações, BDRs e ETFs. Os valores alimentam a matriz mensal abaixo e o card de Dividendos.</p>
           <form id="form-div" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-3 items-end">
@@ -577,14 +582,14 @@
           </form>
           <datalist id="lista-ativos"></datalist>
         </div>
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-aba="ano" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 class="font-semibold">Resumo de Dividendos — <span class="ano-label"></span></h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">Valores recebidos por ativo, mês a mês</p>
           </div>
           <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-divmatriz"></table></div>
         </div>
-        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div data-aba="lancamentos" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <h2 class="font-semibold">Lançamentos de <span class="ano-label"></span></h2>
             <span id="div-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
@@ -635,16 +640,16 @@
   const MESES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const SECOES = [
     { id: 'dashboard', nome: 'Dashboard', icon: 'layout-dashboard', sub: 'Visão executiva do seu patrimônio' },
-    { id: 'gastos', nome: 'Gastos Mensais', icon: 'receipt', sub: 'Orçamento por categoria, mês a mês' },
-    { id: 'recebimentos', nome: 'Recebimentos', icon: 'hand-coins', sub: 'Salário, Pix e outras entradas, mês a mês' },
-    { id: 'contas', nome: 'Saldo em Conta', icon: 'wallet', sub: 'Quanto você tem hoje em cada conta' },
-    { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro' },
-    { id: 'bolsa', nome: 'Ações e FIIs', icon: 'activity', sub: 'Carteira na bolsa com cotações da brapi' },
-    { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo' },
-    { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês' },
-    { id: 'lucro', nome: 'Resumo do Lucro', icon: 'table', sub: 'Matriz mensal de lucro por fundo' },
-    { id: 'dividendos', nome: 'Dividendos', icon: 'coins', sub: 'Proventos de FIIs e ações mês a mês' },
-    { id: 'bancos', nome: 'Bancos', icon: 'building-2', sub: 'Investimentos e gastos consolidados por banco' },
+    { id: 'gastos', nome: 'Gastos Mensais', icon: 'receipt', sub: 'Orçamento por categoria, mês a mês', grupo: 'Dia a dia' },
+    { id: 'recebimentos', nome: 'Recebimentos', icon: 'hand-coins', sub: 'Salário, Pix e outras entradas, mês a mês', grupo: 'Dia a dia' },
+    { id: 'contas', nome: 'Saldo em Conta', icon: 'wallet', sub: 'Quanto você tem hoje em cada conta', grupo: 'Dia a dia' },
+    { id: 'rendafixa', nome: 'Renda Fixa', icon: 'landmark', sub: 'Ativos, valor investido, valor atual e lucro', grupo: 'Investimentos' },
+    { id: 'bolsa', nome: 'Ações e FIIs', icon: 'activity', sub: 'Carteira na bolsa com cotações da brapi', grupo: 'Investimentos' },
+    { id: 'historico', nome: 'Histórico', icon: 'history', sub: 'Aportes e resgates por fundo', grupo: 'Investimentos' },
+    { id: 'saldos', nome: 'Saldos Mensais', icon: 'calendar-check', sub: 'Saldo total de cada conta ao fim do mês', grupo: 'Investimentos' },
+    { id: 'lucro', nome: 'Resumo do Lucro', icon: 'table', sub: 'Matriz mensal de lucro por fundo', grupo: 'Investimentos' },
+    { id: 'dividendos', nome: 'Dividendos', icon: 'coins', sub: 'Proventos de FIIs e ações mês a mês', grupo: 'Investimentos' },
+    { id: 'bancos', nome: 'Bancos', icon: 'building-2', sub: 'Investimentos e gastos consolidados por banco', grupo: 'Cadastros' },
   ];
   const EPS = 0.005;
 
@@ -776,7 +781,7 @@
     if (!e) return toast(verbo === 'Desfeito' ? 'Nada para desfazer' : 'Nada para refazer', 'info');
     para.push({ dados: JSON.stringify(dadosNuvem()), rotulo: e.rotulo, em: Date.now() });
     const dados = JSON.parse(e.dados);
-    const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor };
+    const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas };
     restaurando = true;
     state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
     save(); render();
@@ -1270,6 +1275,7 @@
   // ---------- Renderização ----------
   function render() {
     renderNav();
+    renderAbas();
     renderAno();
     renderSelects();
     renderDashboard();
@@ -1294,7 +1300,8 @@
 
   function renderNav() {
     const atual = state.config.secao;
-    $('#nav-desktop').innerHTML = SECOES.map(s => `
+    $('#nav-desktop').innerHTML = SECOES.map((s, i) => (s.grupo && s.grupo !== SECOES[i - 1]?.grupo
+      ? `<div class="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">${s.grupo}</div>` : '') + `
       <button data-secao="${s.id}" class="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${s.id === atual
         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}">
@@ -1308,6 +1315,31 @@
     $('#titulo-secao').textContent = sec.nome;
     $('#sub-secao').textContent = sec.sub;
     $$('.secao').forEach(el => el.classList.toggle('hidden', el.id !== 'sec-' + sec.id));
+  }
+
+  // Abas dentro das páginas longas; a aba aberta de cada página fica salva só neste aparelho
+  const ABAS = {
+    gastos: [['orcamento', 'Orçamento e lançamento'], ['lancamentos', 'Lançamentos do mês'], ['ano', 'Resumo do ano']],
+    recebimentos: [['lancamentos', 'Lançamentos'], ['ano', 'Entradas e saídas do ano']],
+    contas: [['contas', 'Contas'], ['transferencias', 'Transferências']],
+    bolsa: [['carteira', 'Carteira'], ['registrar', 'Registrar compra e token']],
+    dividendos: [['ano', 'Resumo do ano'], ['lancamentos', 'Lançar e lançamentos']],
+  };
+  function abaAtual(sec) {
+    const a = (state.config.abas || {})[sec];
+    return ABAS[sec].some(([k]) => k === a) ? a : ABAS[sec][0][0];
+  }
+  function renderAbas() {
+    for (const [sec, abas] of Object.entries(ABAS)) {
+      const barra = $(`[data-abas="${sec}"]`);
+      if (!barra) continue;
+      const atual = abaAtual(sec);
+      barra.innerHTML = abas.map(([k, nome]) => `<button type="button" role="tab" aria-selected="${k === atual}" data-action="aba" data-sec="${sec}" data-aba-id="${k}"
+        class="shrink-0 px-3 py-2 -mb-px border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${k === atual
+          ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400'
+          : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}">${nome}</button>`).join('');
+      $$(`#sec-${sec} [data-aba]`).forEach(el => el.classList.toggle('hidden', el.dataset.aba !== atual));
+    }
   }
 
   function renderAno() {
@@ -2382,6 +2414,7 @@
         break;
       }
       case 'nuvem': nuvem.clique(); break;
+      case 'aba': state.config.abas = { ...(state.config.abas || {}), [btn.dataset.sec]: btn.dataset.abaId }; save(); renderAbas(); break;
       case 'desfazer': restaurar(pilhaDesfazer, pilhaRefazer, 'Desfeito'); break;
       case 'refazer': restaurar(pilhaRefazer, pilhaDesfazer, 'Refeito'); break;
       case 'edit-fundo': modalEditarFundo(id); break;
@@ -2635,7 +2668,7 @@
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
     function aplicar(dados) {
       pilhaDesfazer.length = 0; pilhaRefazer.length = 0;
-      const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor };
+      const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas };
       state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
       ultimaImpressao = JSON.stringify(dadosNuvem());
       try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
