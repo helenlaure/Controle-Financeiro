@@ -252,6 +252,10 @@
                 <label class="text-sm">Tipo
                   <select name="tipo" class="inp"><option>Salário</option><option>Pix recebido</option><option>Pagamento recebido</option><option>Freelance / extra</option><option>Vale / benefício</option><option>Reembolso / devolução</option><option>Outros</option></select>
                 </label>
+                <label data-campo-reembolso class="text-sm hidden">Abater do gasto da categoria
+                  <select name="categoria" class="inp sel-categoria"></select>
+                  <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">O valor diminui o gasto dessa categoria no mês e não conta como recebido.</span>
+                </label>
                 <label class="text-sm">Banco / conta que recebeu
                   <select name="banco" data-opcional class="inp sel-banco"></select>
                 </label>
@@ -275,7 +279,7 @@
         <div data-aba="ano" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 class="font-semibold">Entradas e saídas — <span class="ano-label"></span></h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Recebimentos por tipo, mês a mês, comparados com os gastos. Sobra = recebido − gasto.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Recebimentos por tipo, mês a mês, comparados com os gastos. Reembolsos entram abatendo o gasto. Sobra = recebido − gasto.</p>
           </div>
           <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-receb-matriz"></table></div>
         </div>
@@ -930,6 +934,7 @@
     modalForm('Editar recebimento', [
       { id: 'data', label: 'Data', type: 'date', value: r.data },
       { id: 'tipo', label: 'Tipo', type: 'select', value: r.tipo, options: tipos.map(t => [t, t]) },
+      { id: 'categoria', label: 'Categoria do gasto (só para reembolso)', type: 'select', value: ehReembolso(r) ? catReembolso(r) : '', options: [['', '—'], ...state.categorias.map(c => [c.id, c.nome])] },
       { id: 'banco', label: 'Banco / conta que recebeu', type: 'select', value: r.banco || '', options: [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b])] },
       { id: 'descricao', label: 'Descrição', value: r.descricao },
       { id: 'valor', label: 'Valor (R$)', type: 'valor', value: r.valor },
@@ -938,6 +943,7 @@
       if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
       const antes = { ...r };
       Object.assign(r, { data: v.data, tipo: v.tipo, banco: v.banco, descricao: v.descricao || v.tipo, valor: round2(v.valor) });
+      if (ehReembolso(r) && catById(v.categoria)) r.categoriaId = v.categoria; else delete r.categoriaId;
       state.config.ano = +v.data.slice(0, 4); state.config.mesGastos = +v.data.slice(5, 7);
       commit(id);
       toast('Recebimento atualizado', 'success', () => { Object.assign(r, antes); commit(id); });
@@ -1076,7 +1082,7 @@
     for (const r of d.recebimentos || []) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.data) || !(+r.valor > 0)) continue;
       if (existentesR.has(chave(r))) { repetidos++; continue; }
-      state.recebimentos.push({ id: uid(), data: r.data, tipo: r.tipo || 'Outros', banco: r.banco || '', descricao: r.descricao || '', valor: round2(+r.valor) });
+      state.recebimentos.push({ id: uid(), data: r.data, tipo: r.tipo || 'Outros', banco: r.banco || '', descricao: r.descricao || '', valor: round2(+r.valor), ...(r.categoriaId ? { categoriaId: r.categoriaId } : {}) });
       existentesR.add(chave(r));
       novosR++;
     }
@@ -1161,8 +1167,19 @@
   const catById = id => state.categorias.find(c => c.id === id);
   const mesGastosKey = () => `${state.config.ano}-${pad(state.config.mesGastos)}`;
   const totalLimites = () => state.categorias.reduce((s, c) => s + (+c.limite || 0), 0);
-  const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
-  const totalReceb = ym => state.recebimentos.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+  // Reembolso/devolução não é dinheiro novo: diminui o gasto da categoria no mês
+  const ehReembolso = r => r.tipo === 'Reembolso / devolução';
+  const semAcento = t => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  function catReembolso(r) {
+    if (r.categoriaId && catById(r.categoriaId)) return r.categoriaId;
+    // Lançamentos antigos sem categoria: usa a do gasto de mesma descrição no mês (ex.: "Inglês" → Educação)
+    const g = state.gastos.find(x => mesDe(x.data) === mesDe(r.data) && semAcento(x.descricao) === semAcento(r.descricao));
+    return g?.categoriaId || (catById('c-out') ? 'c-out' : state.categorias[0]?.id || '');
+  }
+  const reembolsosDoMes = ym => state.recebimentos.filter(r => ehReembolso(r) && mesDe(r.data) === ym);
+  const totalGastos = ym => state.gastos.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0)
+    - reembolsosDoMes(ym).reduce((s, r) => s + r.valor, 0);
+  const totalReceb = ym => state.recebimentos.filter(r => !ehReembolso(r) && mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
   // Saldo em conta: valor informado + (recebimentos − gastos do mesmo banco depois da data), se a atualização automática estiver ligada
   // Transferências valem para qualquer conta (automática ou manual), pois apontam a conta exata
   function movimentoDesde(c) {
@@ -1182,6 +1199,7 @@
   function gastoPorCat(ym) {
     const m = new Map();
     for (const g of state.gastos) if (mesDe(g.data) === ym) m.set(g.categoriaId, (m.get(g.categoriaId) || 0) + g.valor);
+    for (const r of reembolsosDoMes(ym)) { const c = catReembolso(r); m.set(c, (m.get(c) || 0) - r.valor); }
     return m;
   }
 
@@ -1482,10 +1500,13 @@
       const gMes = gs.filter(g => mesDe(g.data) === ym).reduce((s, g) => s + g.valor, 0);
       const gAno = gs.filter(g => g.data.startsWith(String(ano))).reduce((s, g) => s + g.valor, 0);
       const rs = state.recebimentos.filter(r => (r.banco || '') === b);
-      const rMes = rs.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+      const rb = rs.filter(ehReembolso);
+      const rMes = rs.filter(r => !ehReembolso(r) && mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+      const abMes = rb.filter(r => mesDe(r.data) === ym).reduce((s, r) => s + r.valor, 0);
+      const abAno = rb.filter(r => r.data.startsWith(String(ano))).reduce((s, r) => s + r.valor, 0);
       const cs = state.contas.filter(c => (c.banco || '') === b);
       const conta = cs.reduce((s, c) => s + saldoAtual(c), 0);
-      return { b, nFundos: fs.length, nGastos: gs.length + rs.length + cs.length, conta, inv, atual, lucro: atual - inv, rMes, gMes, gAno };
+      return { b, nFundos: fs.length, nGastos: gs.length + rs.length + cs.length, conta, inv, atual, lucro: atual - inv, rMes, gMes: gMes - abMes, gAno: gAno - abAno };
     };
     const linhas = bancosOrdenados().map(linha);
     if (state.gastos.some(g => !g.banco) || state.recebimentos.some(r => !r.banco) || state.contas.some(c => !c.banco)) linhas.push(linha(''));
@@ -1761,10 +1782,12 @@
 
     const lista = state.recebimentos.filter(r => mesDe(r.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
     const pgR = paginar('receb', lista, ym); controlesPag('tbl-receb', pgR.controles);
-    const total = lista.reduce((s, r) => s + r.valor, 0), gasto = totalGastos(ym), sobra = total - gasto;
+    const total = totalReceb(ym), gasto = totalGastos(ym), sobra = total - gasto;
+    const reemb = reembolsosDoMes(ym).reduce((s, r) => s + r.valor, 0);
     const kpi = (rot, val, cls = 'text-slate-800 dark:text-slate-100') =>
       `<span class="text-slate-500 dark:text-slate-400">${rot} <strong class="num ml-1 ${cls}">${val}</strong></span>`;
-    $('#receb-kpis').innerHTML = kpi('Recebido no mês', brl(total), 'text-emerald-600 dark:text-emerald-400') + kpi('Gasto no mês', brl(gasto)) +
+    $('#receb-kpis').innerHTML = kpi('Recebido no mês', brl(total), 'text-emerald-600 dark:text-emerald-400') +
+      (reemb ? kpi('Reembolsos (abatidos dos gastos)', brl(reemb)) : '') + kpi('Gasto no mês', brl(gasto)) +
       kpi(sobra >= 0 ? 'Sobra do mês' : 'Faltou no mês', brl(Math.abs(sobra)), tone(sobra));
 
     // Lista do mês
@@ -1772,16 +1795,16 @@
     $('#tbl-receb').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Tipo</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
       <tbody>${pgR.itens.map(r => `<tr class="${r.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtData(r.data)}</td>
-        <td class="td"><span class="text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5">${esc(r.tipo)}</span></td>
+        <td class="td"><span class="text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5">${esc(r.tipo)}</span>${ehReembolso(r) ? `<div class="text-[11px] text-slate-400 mt-0.5">abate de ${esc(catById(catReembolso(r))?.nome || '—')}</div>` : ''}</td>
         <td class="td ${r.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(r.banco || 'Não informado')}</td>
         <td class="td text-slate-600 dark:text-slate-300">${esc(r.descricao)}</td>
         <td class="td text-right num font-medium text-emerald-600 dark:text-emerald-400">${brl(r.valor)}</td>
         <td class="td text-right"><button class="btn-edit" data-action="edit-receb" data-id="${r.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-receb" data-id="${r.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum recebimento lançado neste mês.')}</tbody>
-      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês</td><td class="td text-right num text-emerald-600 dark:text-emerald-400">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total recebido${reemb ? ' (sem os reembolsos)' : ''}</td><td class="td text-right num text-emerald-600 dark:text-emerald-400">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
 
     // Por tipo no mês
     const porTipo = new Map();
-    for (const r of lista) porTipo.set(r.tipo, (porTipo.get(r.tipo) || 0) + r.valor);
+    for (const r of lista) if (!ehReembolso(r)) porTipo.set(r.tipo, (porTipo.get(r.tipo) || 0) + r.valor);
     $('#receb-por-tipo').innerHTML = porTipo.size ? [...porTipo].sort((a, b) => b[1] - a[1]).map(([t, v]) => {
       const p = total > 0 ? v / total : 0;
       return `<div>
@@ -1792,7 +1815,7 @@
 
     // Matriz tipo × mês, com gastos e sobra
     const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
-    const doAno = state.recebimentos.filter(r => r.data.startsWith(String(ano)));
+    const doAno = state.recebimentos.filter(r => !ehReembolso(r) && r.data.startsWith(String(ano)));
     const tipos = [...TIPOS_RECEB, ...new Set(doAno.map(r => r.tipo).filter(t => !TIPOS_RECEB.includes(t)))].filter(t => doAno.some(r => r.tipo === t));
     const celula = (v, cls = '') => Math.abs(v) < EPS ? `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>` : `<td class="td text-right num ${cls}">${num(v)}</td>`;
     const meses = MESES.map((_, i) => `${ano}-${pad(i + 1)}`);
@@ -1855,7 +1878,9 @@
         <td class="td num">${brl(lim)}</td><td class="td num text-xs text-slate-500 dark:text-slate-400">${lim ? Math.round(total / lim * 100) + '% do orçamento' : ''}</td><td class="td" colspan="2"></td></tr></tfoot>` : ''}`;
 
     // Lançamentos do mês
-    const lista = state.gastos.filter(g => mesDe(g.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
+    const lista = [...state.gastos.filter(g => mesDe(g.data) === ym),
+      ...reembolsosDoMes(ym).map(r => ({ id: r.id, data: r.data, categoriaId: catReembolso(r), banco: r.banco, descricao: r.descricao, valor: -r.valor, reembolso: true }))]
+      .sort((a, b) => b.data.localeCompare(a.data));
     const pgG = paginar('gastos', lista, ym); controlesPag('tbl-gastos', pgG.controles);
     $('#gastos-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
     $('#tbl-gastos').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Categoria</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
@@ -1863,9 +1888,9 @@
         <td class="td num">${fmtData(g.data)}</td>
         <td class="td"><span class="text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5">${esc(catById(g.categoriaId)?.nome ?? 'Sem categoria')}</span></td>
         <td class="td ${g.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(g.banco || 'Não informado')}</td>
-        <td class="td text-slate-600 dark:text-slate-300">${esc(g.descricao)}</td>
-        <td class="td text-right num font-medium">${brl(g.valor)}</td>
-        <td class="td text-right"><button class="btn-edit" data-action="edit-gasto" data-id="${g.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-gasto" data-id="${g.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum gasto lançado neste mês.')}</tbody>
+        <td class="td text-slate-600 dark:text-slate-300">${esc(g.descricao)}${g.reembolso ? ' <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5">reembolso</span>' : ''}</td>
+        <td class="td text-right num font-medium ${g.reembolso ? 'text-emerald-600 dark:text-emerald-400' : ''}">${brl(g.valor)}</td>
+        <td class="td text-right"><button class="btn-edit" data-action="${g.reembolso ? 'edit-receb' : 'edit-gasto'}" data-id="${g.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="${g.reembolso ? 'del-receb' : 'del-gasto'}" data-id="${g.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum gasto lançado neste mês.')}</tbody>
       ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês</td><td class="td text-right num">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
 
     // Gastos do mês por banco
@@ -2331,12 +2356,18 @@
     const v = parseValor(fm.valor.value);
     if (!isFinite(v) || v <= 0) return invalido(fm.valor, 'Informe um valor maior que zero.');
     const r = { id: uid(), data: fm.data.value, tipo: fm.tipo.value, banco: fm.banco.value, descricao: fm.descricao.value.trim() || fm.tipo.value, valor: round2(v) };
+    if (ehReembolso(r) && catById(fm.categoria.value)) r.categoriaId = fm.categoria.value;
     state.recebimentos.push(r);
     state.config.ano = +r.data.slice(0, 4);
     state.config.mesGastos = +r.data.slice(5, 7);
     fm.valor.value = ''; fm.descricao.value = '';
     commit(r.id);
     toast(`${r.tipo} de ${brl(v)} lançado`);
+  });
+
+  // O campo de categoria só aparece para reembolso
+  $('#form-receb [name=tipo]').addEventListener('change', e => {
+    $('#form-receb [data-campo-reembolso]').classList.toggle('hidden', e.target.value !== 'Reembolso / devolução');
   });
 
   $('#form-banco').addEventListener('submit', e => {
