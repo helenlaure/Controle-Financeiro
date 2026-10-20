@@ -1042,7 +1042,7 @@
 
   // Arquivo de lançamentos: acrescenta gastos, recebimentos e investimentos sem substituir os dados atuais
   function adicionarLancamentos(d) {
-    if (!['gastos', 'recebimentos', 'fundos', 'historico'].some(k => Array.isArray(d[k]))) throw new Error('formato');
+    if (!['gastos', 'recebimentos', 'fundos', 'historico', 'saldos'].some(k => Array.isArray(d[k]))) throw new Error('formato');
     const antes = JSON.parse(JSON.stringify(state));
     if (state.config.exemplo) {
       const cfg = state.config;
@@ -1093,12 +1093,25 @@
       if (existentesH.has(chaveH(novo))) { repetidos++; continue; }
       state.historico.push(novo); existentesH.add(chaveH(novo)); novosH++;
     }
+    // Saldos de fim de mês: um por fundo e mês; se já existir com outro valor, é atualizado
+    let novosS = 0, atualizadosS = 0;
+    for (const x of d.saldos || []) {
+      const f = acharFundo(x.fundo, mesmoBanco(x.banco) || x.banco);
+      if (!f || !/^\d{4}-\d{2}$/.test(x.mes) || !isFinite(+x.valor) || +x.valor < 0) continue;
+      const v = round2(+x.valor), ex = state.saldos.find(y => y.fundoId === f.id && y.mes === x.mes);
+      if (!ex) { state.saldos.push({ id: uid(), fundoId: f.id, mes: x.mes, valor: v }); novosS++; }
+      else if (ex.valor !== v) { ex.valor = v; atualizadosS++; }
+      else repetidos++;
+    }
+    const ultimoSaldo = (d.saldos || []).map(x => x.mes).sort().pop();
+    if (ultimoSaldo && !(d.gastos || d.recebimentos)) state.config.ano = +ultimoSaldo.slice(0, 4);
     sincronizarBancos(state);
     const ultima = [...(d.gastos || []), ...(d.recebimentos || [])].map(g => g.data).sort().pop();
     if (ultima) { state.config.ano = +ultima.slice(0, 4); state.config.mesGastos = +ultima.slice(5, 7); }
-    state.config.secao = novos ? 'gastos' : novosR ? 'recebimentos' : (novosF || novosH) ? 'rendafixa' : state.config.secao;
+    state.config.secao = novos ? 'gastos' : novosR ? 'recebimentos' : (novosF || novosH) ? 'rendafixa' : (novosS || atualizadosS) ? 'lucro' : state.config.secao;
     commit();
-    const partes = [novos && `${novos} gastos`, novosR && `${novosR} recebimentos`, novosF && `${novosF} fundos`, novosH && `${novosH} aportes/resgates`]
+    const partes = [novos && `${novos} gastos`, novosR && `${novosR} recebimentos`, novosF && `${novosF} fundos`, novosH && `${novosH} aportes/resgates`,
+      novosS && `${novosS} saldos mensais`, atualizadosS && `${atualizadosS} saldos atualizados`]
       .filter(Boolean).join(', ') || 'Nenhum lançamento novo';
     toast(`${partes} adicionados${repetidos ? `, ${repetidos} repetidos ignorados` : ''}`, 'success', () => { state = antes; commit(); });
   }
