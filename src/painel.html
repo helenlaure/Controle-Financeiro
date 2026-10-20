@@ -1871,17 +1871,38 @@
     let totSelAno = 0;
     for (let i = 0; i < 12; i++) for (const [id, v] of gastoPorCat(`${ano}-${pad(i + 1)}`)) if (sel.has(id)) totSelAno += v;
     const limSel = state.categorias.filter(c => sel.has(c.id)).reduce((a, c) => a + (+c.limite || 0), 0);
-    const chip = (id, nome, valor, marcado) => `<label class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm cursor-pointer select-none transition-colors ${marcado
-        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200'
-        : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}">
-      <input type="checkbox" data-filtro-cat="${id}" ${marcado ? 'checked' : ''} class="h-4 w-4 accent-emerald-600">
-      <span>${esc(nome)}</span>${valor != null ? `<span class="num text-xs opacity-75">${brl(valor)}</span>` : ''}</label>`;
-    $('#filtro-cats').innerHTML = `<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 mb-3">
-        <div class="text-sm font-medium">Ver total gasto por categoria</div>
-        <div class="text-sm"><span class="text-slate-500 dark:text-slate-400">${todas ? 'Todas as categorias' : sel.size ? `${sel.size} ${sel.size === 1 ? 'categoria marcada' : 'categorias marcadas'}` : 'Nenhuma categoria marcada'}:</span>
-          <strong class="num ml-1">${brl(totSelMes)}</strong> <span class="text-slate-500 dark:text-slate-400">em ${MESES_FULL[mes - 1]}</span>
-          <span class="text-slate-400 mx-1">·</span><strong class="num">${brl(totSelAno)}</strong> <span class="text-slate-500 dark:text-slate-400">em ${ano}</span></div></div>
-      <div class="flex flex-wrap gap-2">${chip('__todos', 'Tudo', null, todas)}${state.categorias.map(c => chip(c.id, c.nome, porCat.get(c.id) || 0, sel.has(c.id))).join('')}</div>`;
+    const totMesTodas = [...porCat].reduce((a, [, v]) => a + v, 0);
+    const parte = totMesTodas > 0 ? Math.max(0, Math.min(1, totSelMes / totMesTodas)) : 0;
+    const chip = (id, nome, valor, marcado) => `<label class="cursor-pointer select-none rounded-xl has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500">
+      <input type="checkbox" data-filtro-cat="${id}" ${marcado ? 'checked' : ''} class="sr-only">
+      <span class="flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors ${marcado
+        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100'
+        : 'border-slate-200 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'}">
+        <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full ${marcado ? 'bg-emerald-500 text-white' : 'border border-slate-300 dark:border-slate-600'}">
+          ${marcado ? '<svg viewBox="0 0 12 12" class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5 9.5 3.8"/></svg>' : ''}</span>
+        <span class="leading-tight"><span class="block text-sm font-medium">${esc(nome)}</span>${valor != null
+          ? `<span class="block text-[11px] num ${marcado ? 'text-emerald-700/80 dark:text-emerald-300/80' : 'text-slate-400'}">${brl(valor)}</span>` : ''}</span>
+      </span></label>`;
+    const botaoFiltro = (acao, rotulo, ativo) => `<button type="button" data-action="${acao}" ${ativo ? '' : 'disabled'}
+      class="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent">${rotulo}</button>`;
+    $('#filtro-cats').innerHTML = `
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total gasto nas categorias selecionadas</div>
+          <div class="mt-1 flex flex-wrap items-baseline gap-x-2">
+            <span id="filtro-total-mes" class="text-2xl font-semibold tracking-tight num">${brl(totSelMes)}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">em ${MESES_FULL[mes - 1]}</span>
+          </div>
+          <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"><span id="filtro-total-ano" class="num">${brl(totSelAno)}</span> em ${ano}
+            <span class="mx-1.5 text-slate-300 dark:text-slate-600">•</span><span id="filtro-status">${todas ? 'Todas as categorias' : sel.size ? `${sel.size} de ${state.categorias.length} categorias` : 'Nenhuma categoria selecionada'}</span></div>
+        </div>
+        <div class="flex items-center gap-1">${botaoFiltro('filtro-todas', 'Todas', !todas)}${botaoFiltro('filtro-limpar', 'Limpar', sel.size > 0)}</div>
+      </div>
+      <div class="mt-3 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" title="${pct(parte)} do gasto do mês">
+        <div class="h-full rounded-full bg-emerald-500 transition-all" style="width:${(parte * 100).toFixed(1)}%"></div></div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <span class="hidden">${chip('__todos', 'Tudo', null, todas)}</span>
+        ${state.categorias.map(c => chip(c.id, c.nome, porCat.get(c.id) || 0, sel.has(c.id))).join('')}</div>`;
 
     // Orçamento por categoria
     const rows = state.categorias.filter(c => sel.has(c.id)).map(c => {
@@ -2521,6 +2542,8 @@
         break;
       }
       case 'nuvem': nuvem.clique(); break;
+      case 'filtro-todas': state.config.filtroCats = null; save(); render(); break;
+      case 'filtro-limpar': state.config.filtroCats = []; save(); render(); break;
       case 'pagina': {
         paginas[btn.dataset.tabela].n = +btn.dataset.pagina;
         const tbl = btn.closest('[id^="pag-"]').id.slice(4);
