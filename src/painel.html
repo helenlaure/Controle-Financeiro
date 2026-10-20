@@ -155,6 +155,7 @@
           <div id="gastos-kpis" class="flex flex-wrap gap-x-6 gap-y-1 text-sm"></div>
         </div>
 
+        <div id="filtro-cats" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4"></div>
         <div data-abas="gastos" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
         <div data-aba="orcamento" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -785,7 +786,7 @@
     if (!e) return toast(verbo === 'Desfeito' ? 'Nada para desfazer' : 'Nada para refazer', 'info');
     para.push({ dados: JSON.stringify(dadosNuvem()), rotulo: e.rotulo, em: Date.now() });
     const dados = JSON.parse(e.dados);
-    const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas };
+    const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas, filtroCats: state.config.filtroCats };
     restaurando = true;
     state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
     save(); render();
@@ -1846,6 +1847,11 @@
   const barraOrc = (g, l, st) => `<div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
     <div class="h-full rounded-full ${st.bar}" style="width:${l ? Math.min(100, g / l * 100).toFixed(1) : (g > 0 ? 100 : 0)}%"></div></div>`;
 
+  function catsSelecionadas() {
+    const f = state.config.filtroCats;
+    return Array.isArray(f) ? new Set(f.filter(id => catById(id))) : new Set(state.categorias.map(c => c.id));
+  }
+
   function renderGastos() {
     const ano = state.config.ano, mes = state.config.mesGastos, ym = mesGastosKey();
     $('#sel-mes-gastos').innerHTML = MESES_FULL.map((n, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${n} ${ano}</option>`).join('');
@@ -1859,8 +1865,26 @@
       (lim ? kpi(resto >= 0 ? 'Disponível' : 'Acima do orçamento', brl(Math.abs(resto)), resto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400') : '') +
       kpi('Recebido', brl(receb)) + kpi(sobra >= 0 ? 'Sobra do mês' : 'Faltou no mês', brl(Math.abs(sobra)), tone(sobra));
 
+    // Filtro por categoria: total gasto nas categorias marcadas, no mês e no ano
+    const sel = catsSelecionadas(), todas = state.categorias.length > 0 && sel.size === state.categorias.length;
+    const totSelMes = [...porCat].filter(([id]) => sel.has(id)).reduce((a, [, v]) => a + v, 0);
+    let totSelAno = 0;
+    for (let i = 0; i < 12; i++) for (const [id, v] of gastoPorCat(`${ano}-${pad(i + 1)}`)) if (sel.has(id)) totSelAno += v;
+    const limSel = state.categorias.filter(c => sel.has(c.id)).reduce((a, c) => a + (+c.limite || 0), 0);
+    const chip = (id, nome, valor, marcado) => `<label class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm cursor-pointer select-none transition-colors ${marcado
+        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-200'
+        : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}">
+      <input type="checkbox" data-filtro-cat="${id}" ${marcado ? 'checked' : ''} class="h-4 w-4 accent-emerald-600">
+      <span>${esc(nome)}</span>${valor != null ? `<span class="num text-xs opacity-75">${brl(valor)}</span>` : ''}</label>`;
+    $('#filtro-cats').innerHTML = `<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 mb-3">
+        <div class="text-sm font-medium">Ver total gasto por categoria</div>
+        <div class="text-sm"><span class="text-slate-500 dark:text-slate-400">${todas ? 'Todas as categorias' : sel.size ? `${sel.size} ${sel.size === 1 ? 'categoria marcada' : 'categorias marcadas'}` : 'Nenhuma categoria marcada'}:</span>
+          <strong class="num ml-1">${brl(totSelMes)}</strong> <span class="text-slate-500 dark:text-slate-400">em ${MESES_FULL[mes - 1]}</span>
+          <span class="text-slate-400 mx-1">·</span><strong class="num">${brl(totSelAno)}</strong> <span class="text-slate-500 dark:text-slate-400">em ${ano}</span></div></div>
+      <div class="flex flex-wrap gap-2">${chip('__todos', 'Tudo', null, todas)}${state.categorias.map(c => chip(c.id, c.nome, porCat.get(c.id) || 0, sel.has(c.id))).join('')}</div>`;
+
     // Orçamento por categoria
-    const rows = state.categorias.map(c => {
+    const rows = state.categorias.filter(c => sel.has(c.id)).map(c => {
       const g = porCat.get(c.id) || 0, l = +c.limite || 0, st = statusOrc(g, l);
       return `<tr class="${c.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td font-medium">${esc(c.nome)}</td>
@@ -1873,15 +1897,16 @@
         <td class="td text-right"><button class="btn-del" data-action="del-cat" data-id="${c.id}" title="Excluir categoria"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
     }).join('');
     $('#tbl-orcamento').innerHTML = `<thead><tr><th class="th">Categoria</th><th class="th text-right">Gasto</th><th class="th">Limite mensal</th><th class="th">Uso</th><th class="th">Situação</th><th class="th"></th></tr></thead>
-      <tbody>${rows || emptyRow(6, 'Nenhuma categoria. Crie uma abaixo.')}</tbody>
-      ${state.categorias.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td">Total</td><td class="td text-right num">${brl(total)}</td>
-        <td class="td num">${brl(lim)}</td><td class="td num text-xs text-slate-500 dark:text-slate-400">${lim ? Math.round(total / lim * 100) + '% do orçamento' : ''}</td><td class="td" colspan="2"></td></tr></tfoot>` : ''}`;
+      <tbody>${rows || emptyRow(6, state.categorias.length ? 'Nenhuma categoria marcada no filtro acima.' : 'Nenhuma categoria. Crie uma abaixo.')}</tbody>
+      ${state.categorias.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td">Total${todas ? '' : ' (marcadas)'}</td><td class="td text-right num">${brl(totSelMes)}</td>
+        <td class="td num">${brl(limSel)}</td><td class="td num text-xs text-slate-500 dark:text-slate-400">${limSel ? Math.round(totSelMes / limSel * 100) + '% do orçamento' : ''}</td><td class="td" colspan="2"></td></tr></tfoot>` : ''}`;
 
     // Lançamentos do mês
     const lista = [...state.gastos.filter(g => mesDe(g.data) === ym),
       ...reembolsosDoMes(ym).map(r => ({ id: r.id, data: r.data, categoriaId: catReembolso(r), banco: r.banco, descricao: r.descricao, valor: -r.valor, reembolso: true }))]
-      .sort((a, b) => b.data.localeCompare(a.data));
-    const pgG = paginar('gastos', lista, ym); controlesPag('tbl-gastos', pgG.controles);
+      .sort((a, b) => b.data.localeCompare(a.data)).filter(g => sel.has(g.categoriaId));
+    const totalLista = lista.reduce((a, g) => a + g.valor, 0);
+    const pgG = paginar('gastos', lista, ym + '|' + [...sel].join(',')); controlesPag('tbl-gastos', pgG.controles);
     $('#gastos-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
     $('#tbl-gastos').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Categoria</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
       <tbody>${pgG.itens.map(g => `<tr class="${g.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -1891,14 +1916,14 @@
         <td class="td text-slate-600 dark:text-slate-300">${esc(g.descricao)}${g.reembolso ? ' <span class="ml-1 text-[10px] font-semibold uppercase rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5">reembolso</span>' : ''}</td>
         <td class="td text-right num font-medium ${g.reembolso ? 'text-emerald-600 dark:text-emerald-400' : ''}">${brl(g.valor)}</td>
         <td class="td text-right"><button class="btn-edit" data-action="${g.reembolso ? 'edit-receb' : 'edit-gasto'}" data-id="${g.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="${g.reembolso ? 'del-receb' : 'del-gasto'}" data-id="${g.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(6, 'Nenhum gasto lançado neste mês.')}</tbody>
-      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês</td><td class="td text-right num">${brl(total)}</td><td class="td"></td></tr></tfoot>` : ''}`;
+      ${lista.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td" colspan="4">Total do mês${todas ? '' : ' (categorias marcadas)'}</td><td class="td text-right num">${brl(totalLista)}</td><td class="td"></td></tr></tfoot>` : ''}`;
 
     // Gastos do mês por banco
     const porBanco = new Map();
     for (const g of lista) porBanco.set(g.banco || '', (porBanco.get(g.banco || '') || 0) + g.valor);
     const bl = [...porBanco].sort((a, b) => b[1] - a[1]);
     $('#gastos-por-banco').innerHTML = bl.length ? bl.map(([b, v]) => {
-      const p = total > 0 ? v / total : 0;
+      const p = totalLista > 0 ? v / totalLista : 0;
       return `<div>
         <div class="flex justify-between gap-3 text-sm mb-1"><span class="truncate ${b ? '' : 'text-slate-400'}">${esc(b || 'Não informado')}</span>
           <span class="num shrink-0"><span class="font-medium">${brl(v)}</span> <span class="text-xs text-slate-400">${pct(p)}</span></span></div>
@@ -1908,8 +1933,8 @@
     // Matriz categoria × mês
     const stickyL = 'sticky left-0 z-10 bg-white dark:bg-slate-900';
     const porMes = MESES.map((_, i) => gastoPorCat(`${ano}-${pad(i + 1)}`));
-    const totMes = porMes.map(m => [...m.values()].reduce((a, b) => a + b, 0));
-    const corpo = state.categorias.map(c => {
+    const totMes = porMes.map(m => [...m].filter(([id]) => sel.has(id)).reduce((a, [, v]) => a + v, 0));
+    const corpo = state.categorias.filter(c => sel.has(c.id)).map(c => {
       const l = +c.limite || 0;
       let tot = 0;
       const cells = porMes.map(m => {
@@ -1925,7 +1950,7 @@
     $('#tbl-gastos-matriz').innerHTML = `<thead><tr><th class="th ${stickyL} !bg-slate-50 dark:!bg-slate-900 min-w-[150px]">Categoria</th>${MESES.map(n => `<th class="th text-right">${n}</th>`).join('')}<th class="th text-right">Total</th></tr></thead>
       <tbody>${corpo || emptyRow(14, 'Nenhuma categoria cadastrada.')}</tbody>
       ${state.categorias.length ? `<tfoot><tr class="font-semibold bg-slate-50 dark:bg-slate-900/60"><td class="td ${stickyL} !bg-slate-50 dark:!bg-slate-900">Total Geral</td>
-        ${totMes.map((v, i) => v > EPS ? `<td class="td text-right num ${lim && v > lim ? 'text-rose-600 dark:text-rose-400' : ''}">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
+        ${totMes.map((v, i) => v > EPS ? `<td class="td text-right num ${limSel && v > limSel ? 'text-rose-600 dark:text-rose-400' : ''}">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}
         <td class="td text-right num">${num(totAno)}</td></tr></tfoot>` : ''}`;
   }
 
@@ -2405,6 +2430,18 @@
     toast(`Limite de ${c.nome} ajustado para ${brl(c.limite)}`, 'info');
   });
 
+  // Filtro de categorias em Gastos Mensais ("Tudo" marca/desmarca todas)
+  document.addEventListener('change', e => {
+    const cb = e.target.closest('[data-filtro-cat]');
+    if (!cb) return;
+    const todos = state.categorias.map(c => c.id);
+    let sel = catsSelecionadas();
+    if (cb.dataset.filtroCat === '__todos') sel = new Set(cb.checked ? todos : []);
+    else if (cb.checked) sel.add(cb.dataset.filtroCat); else sel.delete(cb.dataset.filtroCat);
+    state.config.filtroCats = sel.size === todos.length ? null : [...sel];
+    save(); render();
+  });
+
   // Salva o limite enquanto a pessoa digita, para não perder se fechar a página sem sair do campo
   document.addEventListener('input', e => {
     const inp = e.target.closest('[data-limite]');
@@ -2746,7 +2783,7 @@
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
     function aplicar(dados) {
       pilhaDesfazer.length = 0; pilhaRefazer.length = 0;
-      const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas };
+      const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor, abas: state.config.abas, filtroCats: state.config.filtroCats };
       state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
       ultimaImpressao = JSON.stringify(dadosNuvem());
       try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
