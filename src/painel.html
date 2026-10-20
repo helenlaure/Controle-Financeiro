@@ -88,6 +88,8 @@
             <span class="hidden sm:inline text-slate-500 dark:text-slate-400">Ano</span>
             <select id="sel-ano" class="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
           </label>
+          <button id="btn-desfazer" data-action="desfazer" disabled title="Nada para desfazer" aria-label="Desfazer" class="grid h-9 w-9 place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
+          <button id="btn-refazer" data-action="refazer" disabled title="Nada para refazer" aria-label="Refazer" class="hidden sm:grid h-9 w-9 place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
           <button data-action="exportar" title="Exportar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="download" class="w-4 h-4"></i></button>
           <button data-action="importar" title="Importar backup (JSON)" class="h-9 w-9 hidden sm:grid place-items-center rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="upload" class="w-4 h-4"></i></button>
           <button id="btn-nuvem" data-action="nuvem" class="hidden h-9 px-2.5 items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"></button>
@@ -739,18 +741,55 @@
   }
   let ultimaImpressao = JSON.stringify(dadosNuvem());
 
+  // Desfazer / refazer: pilhas com o estado dos dados antes de cada alteração (só nesta aba, até 50 passos)
+  const pilhaDesfazer = [], pilhaRefazer = [];
+  let restaurando = false;
+
   function save() {
     // Só conta como alteração (e sincroniza) quando os dados mudam, não ao trocar de seção ou de mês
     const impressao = JSON.stringify(dadosNuvem());
-    if (impressao !== ultimaImpressao) { ultimaImpressao = impressao; nuvem.alterado(); }
+    if (impressao !== ultimaImpressao) {
+      if (!restaurando) {
+        pilhaDesfazer.push({ dados: ultimaImpressao, rotulo: '', em: Date.now() });
+        if (pilhaDesfazer.length > 50) pilhaDesfazer.shift();
+        pilhaRefazer.length = 0;
+      }
+      ultimaImpressao = impressao; nuvem.alterado();
+    }
     try { localStorage.setItem(KEY, JSON.stringify(state)); }
     catch (e) { toast('Não foi possível salvar no navegador. Exporte um backup.', 'error'); }
+    atualizarDesfazer();
+  }
+
+  function atualizarDesfazer() {
+    const d = $('#btn-desfazer'), r = $('#btn-refazer');
+    if (!d) return;
+    const ud = pilhaDesfazer.at(-1), ur = pilhaRefazer.at(-1);
+    d.disabled = !ud; r.disabled = !ur;
+    d.title = ud ? `Desfazer: ${ud.rotulo || 'última alteração'} (Ctrl+Z)` : 'Nada para desfazer';
+    r.title = ur ? `Refazer: ${ur.rotulo || 'alteração desfeita'} (Ctrl+Y)` : 'Nada para refazer';
+  }
+
+  // Volta os dados para o estado guardado, mantendo ano, mês e seção abertos
+  function restaurar(de, para, verbo) {
+    const e = de.pop();
+    if (!e) return toast(verbo === 'Desfeito' ? 'Nada para desfazer' : 'Nada para refazer', 'info');
+    para.push({ dados: JSON.stringify(dadosNuvem()), rotulo: e.rotulo, em: Date.now() });
+    const dados = JSON.parse(e.dados);
+    const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor };
+    restaurando = true;
+    state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
+    save(); render();
+    restaurando = false;
+    toast(`${verbo}: ${e.rotulo || 'última alteração'}`, 'info');
   }
 
   function commit(id) { novoId = id || null; save(); render(); }
 
   // ---------- Toasts ----------
   function toast(msg, tipo = 'success', undo) {
+    const topo = pilhaDesfazer.at(-1);
+    if (tipo === 'success' && topo && !topo.rotulo && Date.now() - topo.em < 1500) { topo.rotulo = msg; atualizarDesfazer(); }
     const cores = {
       success: ['circle-check', 'text-emerald-600 dark:text-emerald-400'],
       error: ['circle-alert', 'text-rose-600 dark:text-rose-400'],
@@ -1236,6 +1275,7 @@
     $('#cfg-ir').value = String(state.config.aliquotaIR).replace('.', ',');
     $('#cfg-ir-m').value = String(state.config.aliquotaIR).replace('.', ',');
     lucide.createIcons();
+    atualizarDesfazer();
     novoId = null;
   }
 
@@ -2140,6 +2180,15 @@
     buscarCotacoes(true);
   });
 
+  // Ctrl+Z / Ctrl+Y fora dos campos de texto (dentro deles continua valendo o desfazer da digitação)
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable]') || !$('#modal').classList.contains('hidden')) return;
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); restaurar(pilhaDesfazer, pilhaRefazer, 'Desfeito'); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); restaurar(pilhaRefazer, pilhaDesfazer, 'Refeito'); }
+  });
+
   // Mantém as cotações em dia enquanto a página estiver aberta
   setInterval(() => buscarCotacoes(), COT_VALIDADE);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') buscarCotacoes(); });
@@ -2320,6 +2369,8 @@
         break;
       }
       case 'nuvem': nuvem.clique(); break;
+      case 'desfazer': restaurar(pilhaDesfazer, pilhaRefazer, 'Desfeito'); break;
+      case 'refazer': restaurar(pilhaRefazer, pilhaDesfazer, 'Refeito'); break;
       case 'edit-fundo': modalEditarFundo(id); break;
       case 'edit-gasto': editarGasto(id); break;
       case 'edit-receb': editarReceb(id); break;
@@ -2570,6 +2621,7 @@
 
     // Troca os dados deste aparelho pelos recebidos, mantendo ano/mês/seção abertos
     function aplicar(dados) {
+      pilhaDesfazer.length = 0; pilhaRefazer.length = 0;
       const ui = { ano: state.config.ano, mesGastos: state.config.mesGastos, secao: state.config.secao, distPor: state.config.distPor };
       state = normalizar({ ...dados, config: { ...(dados.config || {}), ...ui } });
       ultimaImpressao = JSON.stringify(dadosNuvem());
