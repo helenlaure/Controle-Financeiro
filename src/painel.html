@@ -159,9 +159,12 @@
         <div data-abas="gastos" role="tablist" class="flex gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto overflow-y-hidden scroll-thin"></div>
         <div data-aba="orcamento" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div class="xl:col-span-2 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-              <h2 class="font-semibold">Orçamento por categoria</h2>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Gasto do mês comparado ao limite mensal. Edite o limite direto na tabela.</p>
+            <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="font-semibold">Orçamento por categoria</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Gasto do mês comparado ao limite mensal. Edite o limite direto na tabela.</p>
+              </div>
+              <button type="button" data-action="gerenciar-cats" class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="settings-2" class="w-4 h-4"></i> Gerenciar categorias</button>
             </div>
             <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-orcamento"></table></div>
             <form id="form-cat" class="px-5 py-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3 items-end">
@@ -1773,6 +1776,73 @@
     });
   }
 
+  // ---------- Categorias: gerenciar, renomear e excluir ----------
+  const usoCategoria = id => state.gastos.filter(g => g.categoriaId === id).length + state.recebimentos.filter(r => ehReembolso(r) && r.categoriaId === id).length;
+
+  function gerenciarCategorias() {
+    const linhas = state.categorias.map(c => {
+      const n = usoCategoria(c.id);
+      return `<li class="flex items-center gap-3 py-2.5">
+        <div class="min-w-0 flex-1"><div class="font-medium text-slate-800 dark:text-slate-100 truncate">${esc(c.nome)}</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400">${n ? `${n} ${n === 1 ? 'lançamento' : 'lançamentos'}` : 'sem lançamentos'}${+c.limite ? ` · limite ${brl(+c.limite)}` : ''}</div></div>
+        <button type="button" class="btn-edit" data-action="edit-cat" data-id="${c.id}" title="Renomear"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+        <button type="button" class="btn-del" data-action="del-cat" data-id="${c.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></li>`;
+    }).join('');
+    abrirModal('Gerenciar categorias', `
+      <p>Renomeie ou exclua categorias. Ao excluir uma categoria com lançamentos, você escolhe para onde eles vão.</p>
+      <ul class="mt-3 max-h-[55vh] overflow-y-auto scroll-thin divide-y divide-slate-200 dark:divide-slate-800">${linhas || '<li class="py-4 text-slate-400">Nenhuma categoria.</li>'}</ul>
+      <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">Para criar uma categoria, use "Nova categoria", abaixo da tabela de orçamento.</p>`, [
+      { label: 'Fechar', cls: 'btn-primary', cancelar: true },
+    ]);
+  }
+
+  function editarCategoria(id) {
+    const c = catById(id);
+    if (!c) return;
+    modalForm('Renomear categoria', [
+      { id: 'nome', label: 'Nome', value: c.nome },
+      { id: 'limite', label: 'Limite mensal (R$)', type: 'valor', value: +c.limite || 0 },
+    ], v => {
+      if (!v.nome) return ['nome', 'Informe o nome.'];
+      if (state.categorias.some(x => x.id !== id && x.nome.toLowerCase() === v.nome.toLowerCase())) return ['nome', 'Já existe uma categoria com esse nome.'];
+      if (!isFinite(v.limite) || v.limite < 0) return ['limite', 'Informe um limite válido (zero ou positivo).'];
+      const antes = { ...c };
+      Object.assign(c, { nome: v.nome, limite: round2(v.limite) });
+      commit(id);
+      toast(`Categoria “${v.nome}” atualizada`, 'success', () => { Object.assign(c, antes); commit(id); });
+    });
+  }
+
+  function excluirCategoria(id) {
+    const c = catById(id);
+    if (!c) return;
+    const n = usoCategoria(id), outras = state.categorias.filter(x => x.id !== id);
+    const aplicar = destino => {
+      const backup = JSON.parse(JSON.stringify({ categorias: state.categorias, gastos: state.gastos, recebimentos: state.recebimentos }));
+      state.categorias = outras;
+      if (destino) {
+        state.gastos.forEach(g => { if (g.categoriaId === id) g.categoriaId = destino; });
+        state.recebimentos.forEach(r => { if (r.categoriaId === id) r.categoriaId = destino; });
+      } else {
+        state.gastos = state.gastos.filter(g => g.categoriaId !== id);
+        state.recebimentos.forEach(r => { if (r.categoriaId === id) delete r.categoriaId; });
+      }
+      commit();
+      toast(destino ? `Categoria “${c.nome}” excluída. ${n} ${n === 1 ? 'lançamento foi movido' : 'lançamentos foram movidos'} para ${catById(destino).nome}.`
+        : `Categoria “${c.nome}” excluída${n ? ` com ${n} ${n === 1 ? 'gasto' : 'gastos'}` : ''}`, 'success', () => { Object.assign(state, backup); commit(id); });
+    };
+    if (!n) return aplicar(null);
+    const padrao = outras.find(x => x.id === 'c-out') || outras[0];
+    abrirModal(`Excluir “${c.nome}”`, `
+      <p>Essa categoria tem <strong>${n} ${n === 1 ? 'lançamento' : 'lançamentos'}</strong>. O que fazer com ${n === 1 ? 'ele' : 'eles'}?</p>
+      ${outras.length ? `<form class="mt-3"><label class="text-sm text-slate-800 dark:text-slate-100">Mover para a categoria
+        <select id="m-destino" class="inp">${outras.map(x => `<option value="${x.id}" ${x === padrao ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label></form>` : ''}`, [
+      { label: 'Cancelar', cls: btnSec, cancelar: true },
+      { label: 'Excluir os gastos também', cls: btnPerigo, onClick: () => aplicar(null) },
+      ...(outras.length ? [{ label: 'Mover e excluir', cls: 'btn-primary', onClick: () => aplicar($('#m-destino').value) }] : []),
+    ]);
+  }
+
   // ---------- Recebimentos ----------
   const TIPOS_RECEB = ['Salário', 'Pix recebido', 'Pagamento recebido', 'Freelance / extra', 'Vale / benefício', 'Reembolso / devolução', 'Outros'];
 
@@ -1915,7 +1985,7 @@
         <td class="td min-w-[170px]"><div class="flex items-center gap-2"><div class="flex-1">${barraOrc(g, l, st)}</div>
           <span class="num text-xs w-11 text-right text-slate-500 dark:text-slate-400">${l ? Math.round(g / l * 100) + '%' : '—'}</span></div></td>
         <td class="td"><span class="inline-flex items-center gap-1 text-xs font-medium ${st.txt}"><i data-lucide="${st.icon}" class="w-3.5 h-3.5"></i>${st.label}</span></td>
-        <td class="td text-right"><button class="btn-del" data-action="del-cat" data-id="${c.id}" title="Excluir categoria"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
+        <td class="td text-right whitespace-nowrap"><button class="btn-edit" data-action="edit-cat" data-id="${c.id}" title="Renomear categoria"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-cat" data-id="${c.id}" title="Excluir categoria"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
     }).join('');
     $('#tbl-orcamento').innerHTML = `<thead><tr><th class="th">Categoria</th><th class="th text-right">Gasto</th><th class="th">Limite mensal</th><th class="th">Uso</th><th class="th">Situação</th><th class="th"></th></tr></thead>
       <tbody>${rows || emptyRow(6, state.categorias.length ? 'Nenhuma categoria marcada no filtro acima.' : 'Nenhuma categoria. Crie uma abaixo.')}</tbody>
@@ -2588,16 +2658,9 @@
       }
       case 'mes-ant': mudarMes(-1); break;
       case 'mes-prox': mudarMes(1); break;
-      case 'del-cat': {
-        const c = catById(id), n = state.gastos.filter(g => g.categoriaId === id).length;
-        if (n && !await confirmar('Excluir categoria', `Excluir “${c.nome}”? ${n} ${n === 1 ? 'gasto vinculado também será removido' : 'gastos vinculados também serão removidos'}.`, 'Excluir')) return;
-        const backup = { categorias: [...state.categorias], gastos: [...state.gastos] };
-        state.categorias = state.categorias.filter(x => x.id !== id);
-        state.gastos = state.gastos.filter(x => x.categoriaId !== id);
-        commit();
-        toast(`Categoria “${c.nome}” excluída`, 'success', () => { Object.assign(state, backup); commit(id); });
-        break;
-      }
+      case 'del-cat': excluirCategoria(id); break;
+      case 'edit-cat': editarCategoria(id); break;
+      case 'gerenciar-cats': gerenciarCategorias(); break;
       case 'del-fundo': {
         const f = fundoById(id);
         const nH = state.historico.filter(h => h.fundoId === id).length, nS = state.saldos.filter(s => s.fundoId === id).length;
