@@ -169,7 +169,7 @@
                 <input name="nome" required placeholder="Ex.: Pets" class="inp">
               </label>
               <label class="text-sm">Limite mensal (R$)
-                <input name="limite" inputmode="decimal" placeholder="0,00" class="inp num">
+                <input name="limite" inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
               </label>
               <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Criar categoria</button>
             </form>
@@ -192,7 +192,7 @@
                 <input name="descricao" placeholder="Ex.: Supermercado" class="inp">
               </label>
               <label class="text-sm">Valor (R$)
-                <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+                <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
               </label>
               <button class="btn-primary w-full mt-1"><i data-lucide="plus" class="w-4 h-4"></i> Lançar gasto</button>
             </form>
@@ -264,7 +264,7 @@
                   <input name="descricao" placeholder="Ex.: Salário de outubro" class="inp">
                 </label>
                 <label class="text-sm">Valor (R$)
-                  <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+                  <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
                 </label>
                 <button class="btn-primary w-full mt-1"><i data-lucide="plus" class="w-4 h-4"></i> Lançar recebimento</button>
               </form>
@@ -338,7 +338,7 @@
                 <input name="nome" required list="lista-tipos-conta" value="Conta corrente" class="inp">
               </label>
               <label class="text-sm">Saldo (R$)
-                <input name="saldo" required inputmode="decimal" placeholder="0,00" class="inp num">
+                <input name="saldo" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
                 <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">Se estiver no negativo, use o sinal de menos: -150,00</span>
               </label>
               <label class="text-sm">Data do saldo
@@ -380,7 +380,7 @@
                 <select name="destino" required class="inp sel-od"></select>
               </label>
               <label class="text-sm">Valor (R$)
-                <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+                <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
               </label>
               <label class="text-sm">Descrição
                 <input name="descricao" placeholder="Ex.: Guardar na poupança" class="inp">
@@ -452,7 +452,7 @@
                     <input name="quantidade" required inputmode="decimal" placeholder="0" class="inp num">
                   </label>
                   <label class="text-sm">Preço pago (R$)
-                    <input name="preco" required inputmode="decimal" placeholder="0,00" class="inp num">
+                    <input name="preco" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
                   </label>
                 </div>
                 <label class="text-sm">Corretora
@@ -493,7 +493,7 @@
               <span class="block h-4 mt-1"></span>
             </label>
             <label class="text-sm">Valor (R$)
-              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
               <span class="block h-4 mt-1"></span>
             </label>
             <label class="text-sm">Conta (sai/entra o dinheiro)
@@ -526,7 +526,7 @@
               <select name="fundo" required class="inp sel-fundo"></select>
             </label>
             <label class="text-sm">Saldo total (R$)
-              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
             </label>
             <button class="btn-primary"><i data-lucide="save" class="w-4 h-4"></i> Salvar saldo</button>
           </form>
@@ -581,7 +581,7 @@
               <input name="data" type="date" required class="inp">
             </label>
             <label class="text-sm">Valor (R$)
-              <input name="valor" required inputmode="decimal" placeholder="0,00" class="inp num">
+              <input name="valor" required inputmode="decimal" placeholder="0,00" data-moeda class="inp num">
             </label>
             <button class="btn-primary"><i data-lucide="plus" class="w-4 h-4"></i> Lançar</button>
           </form>
@@ -889,7 +889,7 @@
       const id = 'm-' + c.id;
       let ctl;
       if (c.type === 'select') ctl = `<select id="${id}" class="inp">${c.options.map(([v, t]) => `<option value="${esc(v)}" ${v === c.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-      else if (c.type === 'valor') ctl = `<input id="${id}" inputmode="decimal" value="${num(c.value)}" class="inp num">`;
+      else if (c.type === 'valor') ctl = `<input id="${id}" inputmode="decimal" value="${c.moeda === false ? String(c.value).replace('.', ',') : num(c.value)}" ${c.moeda === false ? '' : 'data-moeda'} class="inp num">`;
       else ctl = `<input id="${id}" type="${c.type || 'text'}" value="${esc(c.value ?? '')}" ${c.list ? `list="${c.list}"` : ''} class="inp">`;
       return `<label class="text-sm">${esc(c.label)}${ctl}</label>`;
     }).join('');
@@ -1642,7 +1642,7 @@
     modalForm('Editar ativo', [
       { id: 'ticker', label: 'Ativo (ticker)', value: a.ticker, list: 'lista-ativos' },
       { id: 'tipo', label: 'Tipo', type: 'select', value: a.tipo, options: ['Ação', 'FII', 'BDR', 'ETF'].map(t => [t, t]) },
-      { id: 'quantidade', label: 'Quantidade', type: 'valor', value: a.quantidade },
+      { id: 'quantidade', label: 'Quantidade', type: 'valor', value: a.quantidade, moeda: false },
       { id: 'preco', label: 'Preço médio (R$)', type: 'valor', value: a.precoMedio },
       { id: 'banco', label: 'Corretora', type: 'select', value: a.banco || '', options: [['', 'Não informado'], ...bancosOrdenados().map(b => [b, b])] },
     ], v => {
@@ -1910,7 +1910,7 @@
       return `<tr class="${c.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td font-medium">${esc(c.nome)}</td>
         <td class="td text-right num">${brl(g)}</td>
-        <td class="td"><input data-limite="${c.id}" value="${num(l)}" inputmode="decimal" aria-label="Limite mensal de ${esc(c.nome)}"
+        <td class="td"><input data-limite="${c.id}" data-moeda value="${num(l)}" inputmode="decimal" aria-label="Limite mensal de ${esc(c.nome)}"
           class="w-28 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-right text-sm num focus:outline-none focus:ring-2 focus:ring-emerald-500"></td>
         <td class="td min-w-[170px]"><div class="flex items-center gap-2"><div class="flex-1">${barraOrc(g, l, st)}</div>
           <span class="num text-xs w-11 text-right text-slate-500 dark:text-slate-400">${l ? Math.round(g / l * 100) + '%' : '—'}</span></div></td>
@@ -2450,6 +2450,15 @@
     c.limite = round2(v); save(); render();
     toast(`Limite de ${c.nome} ajustado para ${brl(c.limite)}`, 'info');
   });
+
+  // Máscara de dinheiro: não precisa digitar vírgula nem ponto
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if (!el.matches?.('[data-moeda]')) return;
+    const neg = el.value.includes('-');
+    const dig = el.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 13);
+    el.value = dig ? (neg ? '-' : '') + (Number(dig) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (neg ? '-' : '');
+  }, true);
 
   // Filtro de categorias em Gastos Mensais ("Tudo" marca/desmarca todas)
   document.addEventListener('change', e => {
