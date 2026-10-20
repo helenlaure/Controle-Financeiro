@@ -1990,9 +1990,9 @@
     }).join('') : `<div class="text-sm text-slate-400">Nenhum valor aplicado ainda.</div>`;
   }
 
-  // Paginação: listas com mais de 20 itens são divididas em páginas. A página volta para a 1
+  // Paginação: listas com mais de 10 itens são divididas em páginas. A página volta para a 1
   // quando o contexto muda (outro mês, filtro ou ano) e pula para onde está um item recém-salvo.
-  const POR_PAGINA = 20;
+  const POR_PAGINA = 10;
   const paginas = {};
   function paginar(chave, lista, contexto = '') {
     const total = lista.length, nPag = Math.max(1, Math.ceil(total / POR_PAGINA));
