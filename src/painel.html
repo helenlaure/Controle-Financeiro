@@ -209,7 +209,7 @@
             <h2 class="font-semibold">Gastos de <span id="gastos-mes-label"></span></h2>
             <span id="gastos-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
           </div>
-          <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-gastos"></table></div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-gastos"></table></div>
         </div>
 
         <div data-aba="ano" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -239,7 +239,7 @@
               <h2 class="font-semibold">Recebimentos de <span id="receb-mes-label"></span></h2>
               <span id="receb-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
             </div>
-            <div class="overflow-x-auto scroll-thin max-h-[520px]"><table class="w-full text-sm" id="tbl-receb"></table></div>
+            <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-receb"></table></div>
           </div>
           <div class="space-y-6 min-w-0">
             <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -358,7 +358,7 @@
               </div>
               <span id="transf-count" class="text-xs text-slate-500 dark:text-slate-400 shrink-0"></span>
             </div>
-            <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-transf"></table></div>
+            <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-transf"></table></div>
           </div>
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
             <h2 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="arrow-left-right" class="w-4 h-4 text-emerald-600"></i> Transferir</h2>
@@ -594,7 +594,7 @@
             <h2 class="font-semibold">Lançamentos de <span class="ano-label"></span></h2>
             <span id="div-count" class="text-xs text-slate-500 dark:text-slate-400"></span>
           </div>
-          <div class="overflow-x-auto scroll-thin max-h-[480px]"><table class="w-full text-sm" id="tbl-div"></table></div>
+          <div class="overflow-x-auto scroll-thin"><table class="w-full text-sm" id="tbl-div"></table></div>
         </div>
       </section>
 
@@ -1677,12 +1677,13 @@
         ? { id: h.id, data: h.data, valor: h.valor, de: nomeConta(h.contaId), para: nomeFundo(h.fundoId), descricao: 'Aporte', editar: 'edit-hist', excluir: 'del-hist' }
         : { id: h.id, data: h.data, valor: -h.valor, de: nomeFundo(h.fundoId), para: nomeConta(h.contaId), descricao: 'Resgate', editar: 'edit-hist', excluir: 'del-hist' }),
     ].sort((a, b) => b.data.localeCompare(a.data));
+    const pgT = paginar('transf', lista); controlesPag('tbl-transf', pgT.controles);
     $('#transf-count').textContent = `${lista.length} ${lista.length === 1 ? 'movimentação' : 'movimentações'}`;
     $('#transf-aviso').innerHTML = state.contas.length >= 2 ? '' : `
       <div class="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
         <i data-lucide="triangle-alert" class="w-4 h-4 shrink-0"></i> Informe o saldo de pelo menos duas contas acima para transferir entre elas.</div>`;
     $('#tbl-transf').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">De</th><th class="th">Para</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
-      <tbody>${lista.map(t => `<tr class="${t.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <tbody>${pgT.itens.map(t => `<tr class="${t.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtData(t.data)}</td>
         <td class="td whitespace-normal">${esc(t.de)}</td>
         <td class="td whitespace-normal">${esc(t.para)}</td>
@@ -1759,6 +1760,7 @@
     $('#receb-mes-label').textContent = `${MESES_FULL[mes - 1]} ${ano}`;
 
     const lista = state.recebimentos.filter(r => mesDe(r.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
+    const pgR = paginar('receb', lista, ym); controlesPag('tbl-receb', pgR.controles);
     const total = lista.reduce((s, r) => s + r.valor, 0), gasto = totalGastos(ym), sobra = total - gasto;
     const kpi = (rot, val, cls = 'text-slate-800 dark:text-slate-100') =>
       `<span class="text-slate-500 dark:text-slate-400">${rot} <strong class="num ml-1 ${cls}">${val}</strong></span>`;
@@ -1768,7 +1770,7 @@
     // Lista do mês
     $('#receb-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
     $('#tbl-receb').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Tipo</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
-      <tbody>${lista.map(r => `<tr class="${r.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <tbody>${pgR.itens.map(r => `<tr class="${r.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtData(r.data)}</td>
         <td class="td"><span class="text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5">${esc(r.tipo)}</span></td>
         <td class="td ${r.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(r.banco || 'Não informado')}</td>
@@ -1854,9 +1856,10 @@
 
     // Lançamentos do mês
     const lista = state.gastos.filter(g => mesDe(g.data) === ym).sort((a, b) => b.data.localeCompare(a.data));
+    const pgG = paginar('gastos', lista, ym); controlesPag('tbl-gastos', pgG.controles);
     $('#gastos-count').textContent = `${lista.length} ${lista.length === 1 ? 'lançamento' : 'lançamentos'}`;
     $('#tbl-gastos').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Categoria</th><th class="th">Banco</th><th class="th">Descrição</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
-      <tbody>${lista.map(g => `<tr class="${g.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <tbody>${pgG.itens.map(g => `<tr class="${g.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtData(g.data)}</td>
         <td class="td"><span class="text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5">${esc(catById(g.categoriaId)?.nome ?? 'Sem categoria')}</span></td>
         <td class="td ${g.banco ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'}">${esc(g.banco || 'Não informado')}</td>
@@ -1987,6 +1990,38 @@
     }).join('') : `<div class="text-sm text-slate-400">Nenhum valor aplicado ainda.</div>`;
   }
 
+  // Paginação: listas com mais de 20 itens são divididas em páginas. A página volta para a 1
+  // quando o contexto muda (outro mês, filtro ou ano) e pula para onde está um item recém-salvo.
+  const POR_PAGINA = 20;
+  const paginas = {};
+  function paginar(chave, lista, contexto = '') {
+    const total = lista.length, nPag = Math.max(1, Math.ceil(total / POR_PAGINA));
+    const pg = paginas[chave] || (paginas[chave] = { n: 1, ctx: contexto });
+    if (pg.ctx !== contexto) { pg.n = 1; pg.ctx = contexto; }
+    const idx = novoId ? lista.findIndex(x => x.id === novoId) : -1;
+    if (idx >= 0) pg.n = Math.floor(idx / POR_PAGINA) + 1;
+    pg.n = Math.min(Math.max(1, pg.n), nPag);
+    const ini = (pg.n - 1) * POR_PAGINA;
+    const itens = lista.slice(ini, ini + POR_PAGINA);
+    if (nPag <= 1) return { itens, controles: '' };
+    const nums = [...new Set([1, pg.n - 1, pg.n, pg.n + 1, nPag])].filter(n => n >= 1 && n <= nPag).sort((a, b) => a - b);
+    const btn = (n, rotulo, ativo = false, desab = false) => `<button type="button" data-action="pagina" data-tabela="${chave}" data-pagina="${n}" ${desab ? 'disabled' : ''}
+      class="h-8 min-w-8 px-2 inline-grid place-items-center rounded-lg text-sm font-medium num ${ativo ? 'bg-emerald-600 text-white' : 'border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-40 disabled:cursor-not-allowed">${rotulo}</button>`;
+    let pags = '';
+    nums.forEach((n, i) => { if (i && n - nums[i - 1] > 1) pags += '<span class="px-1 text-slate-400">…</span>'; pags += btn(n, n, n === pg.n); });
+    const controles = `<div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 dark:border-slate-800">
+      <span class="text-sm text-slate-500 dark:text-slate-400 num">Mostrando ${ini + 1}–${ini + itens.length} de ${total}</span>
+      <div class="flex items-center gap-1">${btn(pg.n - 1, '‹', false, pg.n === 1)}${pags}${btn(pg.n + 1, '›', false, pg.n === nPag)}</div></div>`;
+    return { itens, controles };
+  }
+  // Os controles ficam logo abaixo da tabela, fora da área com rolagem lateral
+  function controlesPag(tabelaId, html) {
+    const tbl = document.getElementById(tabelaId);
+    let el = document.getElementById('pag-' + tabelaId);
+    if (!el) { el = document.createElement('div'); el.id = 'pag-' + tabelaId; tbl.parentElement.after(el); }
+    el.innerHTML = html;
+  }
+
   const emptyRow = (cols, msg) => `<tr><td colspan="${cols}" class="td text-center text-slate-400 py-10">${msg}</td></tr>`;
 
   function renderRF() {
@@ -2019,7 +2054,8 @@
   function renderHist() {
     const filtro = $('#filtro-hist').value;
     const lista = state.historico.filter(h => !filtro || h.fundoId === filtro).sort((a, b) => b.data.localeCompare(a.data));
-    const rows = lista.map(h => {
+    const pg = paginar('hist', lista, filtro); controlesPag('tbl-hist', pg.controles);
+    const rows = pg.itens.map(h => {
       const f = fundoById(h.fundoId);
       return `<tr class="${h.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td font-medium">${esc(f?.nome ?? '—')}</td>
@@ -2042,7 +2078,8 @@
     const filtro = $('#filtro-saldo').value;
     const lista = state.saldos.filter(s => !filtro || s.fundoId === filtro)
       .sort((a, b) => b.mes.localeCompare(a.mes) || (fundoById(a.fundoId)?.nome || '').localeCompare(fundoById(b.fundoId)?.nome || ''));
-    const rows = lista.map(s => {
+    const pg = paginar('saldos', lista, filtro); controlesPag('tbl-saldo', pg.controles);
+    const rows = pg.itens.map(s => {
       const f = fundoById(s.fundoId), r = lucroMes(s.fundoId, s.mes);
       return `<tr class="${s.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtMes(s.mes)}</td>
@@ -2094,9 +2131,10 @@
         ${m.totMes.map(v => v > EPS ? `<td class="td text-right num">${num(v)}</td>` : `<td class="td text-right text-slate-300 dark:text-slate-600">—</td>`).join('')}<td class="td text-right num text-emerald-600 dark:text-emerald-400">${num(m.total)}</td></tr></tfoot>` : ''}`;
 
     const lista = divDoAno(ano).sort((a, b) => b.data.localeCompare(a.data));
+    const pgD = paginar('div', lista, String(ano)); controlesPag('tbl-div', pgD.controles);
     $('#div-count').textContent = `${lista.length} lançamentos`;
     $('#tbl-div').innerHTML = `<thead class="sticky top-0"><tr><th class="th">Data</th><th class="th">Ativo</th><th class="th">Tipo</th><th class="th text-right">Valor</th><th class="th"></th></tr></thead>
-      <tbody>${lista.map(d => `<tr class="${d.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <tbody>${pgD.itens.map(d => `<tr class="${d.id === novoId ? 'row-new' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/40">
         <td class="td num">${fmtData(d.data)}</td><td class="td font-medium">${esc(d.ativo)}</td><td class="td text-slate-600 dark:text-slate-300">${esc(d.tipo)}</td>
         <td class="td text-right num text-emerald-600 dark:text-emerald-400">${brl(d.valor)}</td>
         <td class="td text-right"><button class="btn-edit" data-action="edit-div" data-id="${d.id}" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button><button class="btn-del" data-action="del-div" data-id="${d.id}" title="Excluir"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`).join('') || emptyRow(5, 'Nenhum lançamento neste ano.')}</tbody>`;
@@ -2414,6 +2452,14 @@
         break;
       }
       case 'nuvem': nuvem.clique(); break;
+      case 'pagina': {
+        paginas[btn.dataset.tabela].n = +btn.dataset.pagina;
+        const tbl = btn.closest('[id^="pag-"]').id.slice(4);
+        render();
+        const card = document.getElementById(tbl).closest('.rounded-xl');
+        if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        break;
+      }
       case 'aba': state.config.abas = { ...(state.config.abas || {}), [btn.dataset.sec]: btn.dataset.abaId }; save(); renderAbas(); break;
       case 'desfazer': restaurar(pilhaDesfazer, pilhaRefazer, 'Desfeito'); break;
       case 'refazer': restaurar(pilhaRefazer, pilhaDesfazer, 'Refeito'); break;
