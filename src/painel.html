@@ -956,9 +956,9 @@
     ], v => {
       if (!fundoById(v.fundo)) return ['fundo', 'Escolha um fundo.'];
       if (!v.data) return ['data', 'Informe a data.'];
-      if (valorInvalido(v.valor)) return ['valor', 'Informe um valor maior que zero.'];
+      if (!isFinite(v.valor) || v.valor === 0) return ['valor', 'Informe um valor diferente de zero.'];
       const antes = { ...h };
-      Object.assign(h, { fundoId: v.fundo, data: v.data, valor: round2(v.valor * (v.tipo === 'resgate' ? -1 : 1)) });
+      Object.assign(h, { fundoId: v.fundo, data: v.data, valor: round2(Math.abs(v.valor) * (v.tipo === 'resgate' || v.valor < 0 ? -1 : 1)) });
       if (state.contas.some(c => c.id === v.conta)) h.contaId = v.conta; else delete h.contaId;
       commit(id);
       toast('Movimentação atualizada', 'success', () => { Object.assign(h, antes); commit(id); });
@@ -2166,7 +2166,8 @@
     if (!fundoById(fm.fundo.value)) return toast('Cadastre um fundo antes de lançar movimentações.', 'error');
     let v = parseValor(fm.valor.value);
     if (!isFinite(v) || v === 0) return invalido(fm.valor, 'Informe um valor válido.');
-    v = Math.abs(v) * (fm.tipo.value === 'resgate' ? -1 : 1);
+    // Valor digitado com sinal de menos é resgate, mesmo com o tipo em "Aporte"
+    v = Math.abs(v) * (fm.tipo.value === 'resgate' || v < 0 ? -1 : 1);
     const h = { id: uid(), fundoId: fm.fundo.value, data: fm.data.value, valor: round2(v) };
     if (state.contas.some(c => c.id === fm.conta.value)) h.contaId = fm.conta.value;
     state.historico.push(h);
